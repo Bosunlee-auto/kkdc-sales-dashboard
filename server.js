@@ -4,6 +4,7 @@ const session = require('express-session');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
 const { router: authRouter } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 app.use(express.json());
@@ -23,6 +24,10 @@ app.use('/api/auth', authRouter);
 // NY Sales / NJ Sales / Total Sales / Total Invoice - each gated by
 // Allowed_Dashboards from the logged-in user's CRM record
 app.use('/api/dashboard', dashboardRoutes);
+
+// BEP (Break Even Point) and Sales Quota - editable from the dashboard UI,
+// persisted to the Dashboard_Settings CRM module
+app.use('/api/settings', settingsRoutes);
 
 // Main dashboard data endpoint
 // GET /api/sales-performance?from=2020-01-01&to=2026-12-31&granularity=month
