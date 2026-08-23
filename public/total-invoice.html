@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KKDC — Total Invoice</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="/auth-guard.js"></script>
+<style>
+  :root { --ink:#1a1d1f; --muted:#6b7280; --line:#e5e7eb; --bg:#fafafa; --card:#fff; }
+  * { box-sizing: border-box; }
+  body { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); margin:0; padding:24px; }
+  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .controls { display:flex; gap:12px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin-bottom:20px; }
+  .controls label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  select, input { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; background:var(--card); color:var(--ink); }
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .kpi .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .kpi .value { font-size:20px; font-weight:600; margin-top:4px; }
+  .chart-card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:20px; }
+  .chart-card h2 { font-size:13px; font-weight:600; margin:0 0 12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  canvas { max-height:320px; }
+  .note { font-size:12px; color:var(--muted); background:#fff9db; border:1px solid #f5e19b; border-radius:6px; padding:8px 12px; margin-bottom:20px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+</style>
+</head>
+<body data-dashboard="TOTAL_INVOICE">
+
+<h1>KKDC Sales Performance — Total Invoice</h1>
+<div class="sub">Invoices · full invoiced Amount (freight, tariff, and S&H included) — the only dashboard of the 4 that isn't net-product-only</div>
+
+<div class="note">
+  Margin = Net Product Value − Cost of Goods (from linked Sales Order) − Freight − Tariff (rate schedule by Ship Date: 5.0% Apr–Jul 2025, 9.45% Aug 2025–Mar 2026, 5.0% Apr 2026–present).
+  Invoices with no linked Sales Order, or a Ship Date outside the tariff schedule, are excluded from margin totals rather than estimated — see "Margin excluded" below.
+</div>
+
+<div class="controls">
+  <label>From <input type="date" id="from" value="2025-01-01"></label>
+  <label>To <input type="date" id="to"></label>
+  <label>Granularity
+    <select id="granularity">
+      <option value="month">Month</option>
+      <option value="quarter">Quarter</option>
+      <option value="year">Year</option>
+    </select>
+  </label>
+  <label>&nbsp;<button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button></label>
+</div>
+
+<div class="kpi-row" id="kpiRow"></div>
+<div class="kpi-row" id="kpiRow2" style="grid-template-columns:repeat(3,1fr);"></div>
+
+<div class="chart-card">
+  <h2>Invoice total vs. net product value</h2>
+  <canvas id="invoiceChart"></canvas>
+</div>
+
+<div class="grid2">
+  <div class="chart-card">
+    <h2>Overage — agency (80%) vs. KKDC (20%)</h2>
+    <canvas id="overageChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h2>Margin components</h2>
+    <canvas id="marginChart"></canvas>
+  </div>
+</div>
+
+<div class="chart-card">
+  <h2>Margin % over time</h2>
+  <canvas id="marginPctChart"></canvas>
+</div>
+
+<script>
+document.getElementById('to').value = new Date().toISOString().slice(0, 10);
+const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+let charts = {};
+function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
+function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
+
+async function loadDashboard() {
+  const from = document.getElementById('from').value;
+  const to = document.getElementById('to').value;
+  const granularity = document.getElementById('granularity').value;
+
+  const res = await fetch(`/api/dashboard/total-invoice?from=${from}&to=${to}&granularity=${granularity}`);
+  const { data, error } = await res.json();
+  if (error) { alert(error); return; }
+
+  renderKPIs(data);
+  renderInvoiceChart(data);
+  renderOverageChart(data);
+  renderMarginChart(data);
+  renderMarginPctChart(data);
+}
+
+function renderKPIs(data) {
+  const invoiceTotal = sum(data, 'invoiceTotal');
+  const netProductValue = sum(data, 'netProductValue');
+  const overageAgency = sum(data, 'overageAgencyShare');
+  const overageCompany = sum(data, 'overageCompanyShare');
+  const margin = sum(data, 'marginTotal');
+  const excludedCount = sum(data, 'marginExcludedCount');
+  const excludedValue = sum(data, 'marginExcludedValue');
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi"><div class="label">Invoice Total</div><div class="value">${fmtUSD(invoiceTotal)}</div></div>
+    <div class="kpi"><div class="label">Net Product Value</div><div class="value">${fmtUSD(netProductValue)}</div></div>
+    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div></div>
+    <div class="kpi"><div class="label">Margin excluded (no SO / no tariff match)</div><div class="value" style="color:#dc2626;">${excludedCount} inv / ${fmtUSD(excludedValue)}</div></div>
+  `;
+  document.getElementById('kpiRow2').innerHTML = `
+    <div class="kpi"><div class="label">Overage — Agency (80%)</div><div class="value">${fmtUSD(overageAgency)}</div></div>
+    <div class="kpi"><div class="label">Overage — KKDC (20%)</div><div class="value">${fmtUSD(overageCompany)}</div></div>
+    <div class="kpi"><div class="label">Cost + Freight + Tariff</div><div class="value">${fmtUSD(sum(data,'costOfGoods')+sum(data,'freightTotal')+sum(data,'tariffTotal'))}</div></div>
+  `;
+}
+
+function renderInvoiceChart(data) {
+  charts.invoice = new Chart(document.getElementById('invoiceChart'), {
+    type: 'line',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Invoice Total', data: data.map(p => p.invoiceTotal), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2 },
+      { label: 'Net Product Value', data: data.map(p => p.netProductValue), borderColor: '#2563eb', borderWidth: 2, tension: 0.2 }
+    ]},
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderOverageChart(data) {
+  charts.overage = new Chart(document.getElementById('overageChart'), {
+    type: 'bar',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b' },
+      { label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f' }
+    ]},
+    options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderMarginChart(data) {
+  charts.margin = new Chart(document.getElementById('marginChart'), {
+    type: 'bar',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Cost of Goods', data: data.map(p => p.costOfGoods), backgroundColor: '#6b7280' },
+      { label: 'Freight', data: data.map(p => p.freightTotal), backgroundColor: '#f59e0b' },
+      { label: 'Tariff', data: data.map(p => p.tariffTotal), backgroundColor: '#dc2626' },
+      { label: 'Margin', data: data.map(p => p.marginTotal), backgroundColor: '#059669' }
+    ]},
+    options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderMarginPctChart(data) {
+  charts.marginPct = new Chart(document.getElementById('marginPctChart'), {
+    type: 'line',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Margin %', data: data.map(p => p.marginPct), borderColor: '#059669', borderWidth: 2, tension: 0.2 }
+    ]},
+    options: { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } }
+  });
+}
+
+document.getElementById('refresh').addEventListener('click', () => { destroyCharts(); loadDashboard(); });
+window.__authGuardReady.then(loadDashboard).catch(() => {});
+</script>
+</body>
+</html>
