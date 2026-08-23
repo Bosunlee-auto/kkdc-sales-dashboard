@@ -36,7 +36,7 @@
 </div>
 
 <div class="controls">
-  <label>From <input type="date" id="from" value="2025-01-01"></label>
+  <label>From <input type="date" id="from"></label>
   <label>To <input type="date" id="to"></label>
   <label>Granularity
     <select id="granularity">
@@ -74,6 +74,7 @@
 
 <script>
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
+document.getElementById('from').value = `${new Date().getFullYear()}-01-01`; // default: this year, Jan 1 to today
 const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 let charts = {};
 function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
