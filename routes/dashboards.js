@@ -7,7 +7,7 @@ const { getInvoiceDashboard } = require('../lib/invoiceDashboard');
 
 function parseParams(req) {
   return {
-    from: req.query.from || '2020-01-01',
+    from: req.query.from || `${new Date().getFullYear()}-01-01`,
     to: req.query.to || new Date().toISOString().slice(0, 10),
     granularity: req.query.granularity || 'month'
   };
