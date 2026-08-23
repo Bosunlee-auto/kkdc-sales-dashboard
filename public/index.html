@@ -501,24 +501,21 @@ function renderConversionTable(data) {
   );
 }
 function renderAgencyTable(rows) {
-  const top = rows.slice(0, 25);
   document.getElementById('agencyTable').innerHTML = buildTable(
     ['Agency', 'Order Value', 'Count'],
-    top.map(r => [r.name, fmtUSD(r.amount), r.count])
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
   );
 }
 function renderAccountTable(rows) {
-  const top = rows.slice(0, 15);
   document.getElementById('accountTable').innerHTML = buildTable(
     ['Account', 'Order Value', 'Count'],
-    top.map(r => [r.name, fmtUSD(r.amount), r.count])
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
   );
 }
 function renderCustomerTable(rows) {
-  const top = rows.slice(0, 15);
   document.getElementById('customerTable').innerHTML = buildTable(
     ['Customer', 'Order Value', 'Count'],
-    top.map(r => [r.name, fmtUSD(r.amount), r.count])
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
   );
 }
 function renderYoyTable(yoy) {
