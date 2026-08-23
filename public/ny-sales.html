@@ -2,40 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC — NY Sales</title>
+<title>KKDC Sales Performance — NY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
 <style>
-  :root { --ink:#1a1d1f; --muted:#6b7280; --line:#e5e7eb; --bg:#fafafa; --card:#fff; --accent:#2563eb; }
+  :root {
+    --ink: #1a1d1f;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --ny: #2563eb;
+    --nj: #059669;
+    --combined: #1a1d1f;
+    --lost: #dc2626;
+  }
   * { box-sizing: border-box; }
-  body { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); margin:0; padding:24px; }
-  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
-  .controls { display:flex; gap:12px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin-bottom:20px; }
-  .controls label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
-  select, input { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; background:var(--card); color:var(--ink); }
-  .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
-  .kpi { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
-  .kpi .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  .kpi .value { font-size:20px; font-weight:600; margin-top:4px; }
-  .chart-card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:20px; }
-  .chart-card h2 { font-size:13px; font-weight:600; margin:0 0 12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
-  canvas { max-height:320px; }
-  .note { font-size:12px; color:var(--muted); background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; margin-bottom:20px; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .controls {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;
+  }
+  .controls label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  select, input {
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 13px; background: var(--card); color: var(--ink);
+  }
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+  .kpi .yoy { font-size: 12px; margin-top: 2px; }
+  .yoy.up { color: var(--nj); }
+  .yoy.down { color: var(--lost); }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .chart-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  canvas { max-height: 320px; }
+  #ytdCompareTable th, #ytdCompareTable td { padding: 8px 10px; text-align: right; border-bottom: 0.5px solid var(--line); }
+  #ytdCompareTable th:first-child, #ytdCompareTable td:first-child { text-align: left; }
+  #ytdCompareTable th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  #ytdCompareTable td.pos { color: var(--nj); font-weight: 600; }
+  #ytdCompareTable td.neg { color: var(--lost); font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .note {
+    font-size: 12px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b;
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 20px;
+  }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .chart-header h2 { margin: 0; }
+  .table-toggle {
+    font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .table-toggle:hover { border-color: var(--ink); color: var(--ink); }
+  .table-toggle.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .data-table { max-height: 340px; overflow: auto; }
+  .data-table table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
 </style>
 </head>
 <body data-dashboard="NY">
 
 <h1>KKDC Sales Performance — NY Sales</h1>
-<div class="sub">Sales_Orders · NY_Office_Full_Credit (net product value, freight/tariff excluded)</div>
+<div class="sub">Project → Quote → Order → Shipped funnel, NY office only (NY_Office_Full_Credit basis)</div>
 
 <div class="note">
-  Overage and margin are attributed to NY proportionally to NY's share of each order's Quoted_Price — solo NY orders get 100%, Joint Territory orders split roughly 50/50 (matching the Full_Credit split).
+  Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.
 </div>
 
 <div class="controls">
-  <label>From <input type="date" id="from"></label>
-  <label>To <input type="date" id="to"></label>
+  <label>From
+    <input type="date" id="from">
+  </label>
+  <label>To
+    <input type="date" id="to">
+  </label>
   <label>Granularity
     <select id="granularity">
       <option value="month">Month</option>
@@ -43,105 +101,420 @@
       <option value="year">Year</option>
     </select>
   </label>
-  <label>&nbsp;<button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button></label>
+  <label>&nbsp;
+    <button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button>
+  </label>
+  <label>&nbsp;
+    <button id="settingsToggle" style="padding:6px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;">⚙ BEP / Quota</button>
+  </label>
+</div>
+
+<div class="chart-card" id="settingsPanel" style="display:none;">
+  <h2>NY Break Even Point &amp; Sales Quota — annual figure, auto-converted to the selected granularity</h2>
+  <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:12px; max-width:500px;">
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
+      <input type="number" id="setNyBep" step="1000">
+    </label>
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
+      <input type="number" id="setNyQuota" step="1000">
+    </label>
+  </div>
+  <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
+  <span id="settingsSaved" style="margin-left:10px;font-size:12px;color:var(--nj);display:none;">Saved ✓</span>
 </div>
 
 <div class="kpi-row" id="kpiRow"></div>
 
 <div class="chart-card">
-  <h2>NY revenue over time</h2>
-  <canvas id="revenueChart"></canvas>
+  <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <canvas id="funnelChart"></canvas>
+  <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="chart-card">
-  <h2>Overage — agency (80%) vs. KKDC (20%)</h2>
-  <canvas id="overageChart"></canvas>
+  <div class="chart-header"><h2>Conversion rate — quote to order, order to shipped</h2><button class="table-toggle" data-target="conversion">📊 Table</button></div>
+  <canvas id="conversionChart"></canvas>
+  <div id="conversionTable" class="data-table" style="display:none;"></div>
+</div>
+
+<div class="grid2">
+  <div class="chart-card">
+    <div class="chart-header"><h2>By agency — order value (selected range)</h2><button class="table-toggle" data-target="agency">📊 Table</button></div>
+    <canvas id="agencyChart"></canvas>
+    <div id="agencyTable" class="data-table" style="display:none;"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h2>By account — specifier/designer, top 15 (selected range)</h2><button class="table-toggle" data-target="account">📊 Table</button></div>
+    <canvas id="accountChart"></canvas>
+    <div id="accountTable" class="data-table" style="display:none;"></div>
+  </div>
 </div>
 
 <div class="chart-card">
-  <h2>Margin — $ and %</h2>
-  <canvas id="marginChart"></canvas>
+  <div class="chart-header"><h2>By customer — distributor/wholesaler, top 15 (selected range)</h2><button class="table-toggle" data-target="customer">📊 Table</button></div>
+  <canvas id="customerChart"></canvas>
+  <div id="customerTable" class="data-table" style="display:none;"></div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>Year-over-year — NY order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
+  <canvas id="yoyChart"></canvas>
+  <div id="yoyTable" class="data-table" style="display:none;"></div>
+</div>
+
+<div class="chart-card">
+  <h2>This year to date vs. same period last year</h2>
+  <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Projects registered, Quote, CFM PO, and Shipped — Combined US, NY, and NJ</p>
+  <table id="ytdCompareTable" style="width:100%; font-size:13px; border-collapse:collapse;"></table>
 </div>
 
 <script>
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
 document.getElementById('from').value = `${new Date().getFullYear()}-01-01`; // default: this year, Jan 1 to today
+
 const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 let charts = {};
-function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
-function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
+let lastData = { data: [], yoy: {}, breakdown: {} };
+let settings = { nj: { bepAnnual: 0, quotaAnnual: 0 }, ny: { bepAnnual: 0, quotaAnnual: 0 } };
+
+// Converts an annual figure to the currently selected granularity.
+// month -> /12, quarter -> /4, year -> as-is.
+function perPeriod(annual, granularity) {
+  if (granularity === 'month') return annual / 12;
+  if (granularity === 'quarter') return annual / 4;
+  return annual;
+}
+
+async function loadSettings() {
+  const res = await fetch('/api/settings');
+  settings = await res.json();
+  document.getElementById('setNyBep').value = settings.ny.bepAnnual;
+  document.getElementById('setNyQuota').value = settings.ny.quotaAnnual;
+}
+
+async function saveSettings() {
+  // Backend requires both nj and ny in the payload - NJ's values are left
+  // untouched (not editable from this page), only NY is updated.
+  const body = {
+    nj: settings.nj,
+    ny: { bepAnnual: Number(document.getElementById('setNyBep').value) || 0, quotaAnnual: Number(document.getElementById('setNyQuota').value) || 0 }
+  };
+  const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  settings = await res.json();
+  const savedLabel = document.getElementById('settingsSaved');
+  savedLabel.style.display = 'inline';
+  setTimeout(() => { savedLabel.style.display = 'none'; }, 2000);
+  destroyCharts();
+  loadDashboard(); // re-render charts with the new reference lines
+}
+
+document.getElementById('settingsToggle').addEventListener('click', () => {
+  const panel = document.getElementById('settingsPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
+document.getElementById('saveSettings').addEventListener('click', saveSettings);
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => c && c.destroy());
+  charts = {};
+}
 
 async function loadDashboard() {
   const from = document.getElementById('from').value;
   const to = document.getElementById('to').value;
   const granularity = document.getElementById('granularity').value;
+  const OFFICE = 'NY';
 
-  const res = await fetch(`/api/dashboard/ny-sales?from=${from}&to=${to}&granularity=${granularity}`);
-  const { data, error } = await res.json();
-  if (error) { alert(error); return; }
+  const res = await fetch(`/api/sales-performance?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE}`);
+  const { data } = await res.json();
 
-  renderKPIs(data);
-  renderRevenueChart(data);
-  renderOverageChart(data);
-  renderMarginChart(data);
+  const yoyRes = await fetch(`/api/sales-performance/yoy?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE}`);
+  const yoy = await yoyRes.json();
+
+  const breakdownRes = await fetch(`/api/sales-performance/breakdown?from=${from}&to=${to}&office=${OFFICE}`);
+  const breakdown = await breakdownRes.json();
+
+  lastData = { data, yoy, breakdown };
+
+  renderKPIs(data, yoy);
+  renderFunnelChart(data);
+  renderConversionChart(data);
+  renderYoYChart(yoy);
+  renderYTDCompareTable(yoy);
+  renderAgencyChart(breakdown.byAgency || []);
+  renderAccountChart(breakdown.byAccount || []);
+  renderCustomerChart(breakdown.byCustomer || []);
 }
 
-function renderKPIs(data) {
-  const revenue = sum(data, 'orderRevenue');
-  const overage = sum(data, 'overageTotal');
-  const overageAgency = sum(data, 'overageAgencyShare');
-  const overageCompany = sum(data, 'overageCompanyShare');
+function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
+
+function renderKPIs(data, yoy) {
+  const combined = sum(data, 'combinedUS');
+  const shipped = sum(data, 'shippedAmount');
+  const shippedPlusESD = sum(data, 'shippedPlusESDAmount');
+  const lost = sum(data, 'cancelledAmount');
   const margin = sum(data, 'marginTotal');
+  const cost = sum(data, 'costTotal');
+  const marginPct = (margin + cost) > 0 ? (margin / (margin + cost) * 100) : null;
+
+  const priorCombined = sum(yoy.prior || [], 'combinedUS');
+  const yoyPct = priorCombined > 0 ? ((combined - priorCombined) / priorCombined * 100) : null;
+  const yoyLabel = yoyPct === null ? '' :
+    `<div class="yoy ${yoyPct >= 0 ? 'up' : 'down'}">${yoyPct >= 0 ? '▲' : '▼'} ${Math.abs(yoyPct).toFixed(1)}% YoY</div>`;
+
   document.getElementById('kpiRow').innerHTML = `
-    <div class="kpi"><div class="label">NY Revenue</div><div class="value">${fmtUSD(revenue)}</div></div>
-    <div class="kpi"><div class="label">Overage Total</div><div class="value">${fmtUSD(overage)}</div></div>
-    <div class="kpi"><div class="label">Overage — Agency (80%)</div><div class="value">${fmtUSD(overageAgency)}</div></div>
-    <div class="kpi"><div class="label">Overage — KKDC (20%)</div><div class="value">${fmtUSD(overageCompany)}</div></div>
-    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div></div>
+    <div class="kpi"><div class="label">NY Revenue</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
+    <div class="kpi"><div class="label">Shipped (realized)</div><div class="value">${fmtUSD(shipped)}</div></div>
+    <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
+    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
+    <div class="kpi"><div class="label">Lost pipeline</div><div class="value" style="color:var(--lost)">${fmtUSD(lost)}</div></div>
   `;
 }
 
-function renderRevenueChart(data) {
-  charts.revenue = new Chart(document.getElementById('revenueChart'), {
+function renderFunnelChart(data) {
+  const ctx = document.getElementById('funnelChart');
+  const granularity = document.getElementById('granularity').value;
+  const nyBep = perPeriod(settings.ny.bepAnnual, granularity);
+  const nyQuota = perPeriod(settings.ny.quotaAnnual, granularity);
+  const flat = (v) => data.map(() => v);
+
+  charts.funnel = new Chart(ctx, {
     type: 'line',
-    data: { labels: data.map(p => p.period), datasets: [
-      { label: 'NY Revenue', data: data.map(p => p.orderRevenue), borderColor: '#2563eb', borderWidth: 2, tension: 0.2 },
-      { label: 'Shipped', data: data.map(p => p.shippedRevenue), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2 }
-    ]},
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-  });
-}
-
-function renderOverageChart(data) {
-  charts.overage = new Chart(document.getElementById('overageChart'), {
-    type: 'bar',
-    data: { labels: data.map(p => p.period), datasets: [
-      { label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b' },
-      { label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f' }
-    ]},
-    options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
-  });
-}
-
-function renderMarginChart(data) {
-  charts.margin = new Chart(document.getElementById('marginChart'), {
-    data: { labels: data.map(p => p.period), datasets: [
-      { type: 'bar', label: 'Margin $', data: data.map(p => p.marginTotal), backgroundColor: '#059669', yAxisID: 'y' },
-      { type: 'line', label: 'Margin %', data: data.map(p => p.marginPct), borderColor: '#dc2626', yAxisID: 'y1' }
-    ]},
+    data: {
+      labels: data.map(p => p.period),
+      datasets: [
+        { label: 'Quote (latest)', data: data.map(p => p.quoteAmount), borderColor: '#9ca3af', tension: 0.2, yAxisID: 'y' },
+        { label: 'Order PO', data: data.map(p => p.orderPOAmount), borderColor: '#f59e0b', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
+        { label: 'Shipped + ESD', data: data.map(p => p.shippedPlusESDAmount), borderColor: '#8b5cf6', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
+        { label: 'Shipped (realized)', data: data.map(p => p.shippedAmount), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
+        { label: 'NY BEP', data: flat(nyBep), borderColor: '#dc2626', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, yAxisID: 'y1' },
+        { label: 'NY Quota', data: flat(nyQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
+      ]
+    },
     options: {
       responsive: true,
       plugins: { legend: { position: 'bottom' } },
       scales: {
-        y: { position: 'left', ticks: { callback: v => fmtUSD(v) } },
-        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } }
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } },
+          ticks: { callback: v => fmtUSD(v) }
+        },
+        y1: {
+          position: 'right',
+          title: { display: true, text: 'Order PO / Shipped+ESD / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } },
+          grid: { drawOnChartArea: false },
+          ticks: { callback: v => fmtUSD(v) }
+        }
       }
     }
   });
 }
 
+function renderConversionChart(data) {
+  const ctx = document.getElementById('conversionChart');
+  charts.conversion = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(p => p.period),
+      datasets: [
+        { label: 'Quote → Order %', data: data.map(p => p.quoteToOrderConversion !== null ? p.quoteToOrderConversion * 100 : null), borderColor: '#f59e0b', borderWidth: 2 },
+        { label: 'Order → Shipped %', data: data.map(p => p.orderToShippedConversion !== null ? p.orderToShippedConversion * 100 : null), borderColor: '#dc2626', borderWidth: 2 }
+      ]
+    },
+    options: { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } }
+  });
+}
+
+function renderYoYChart(yoy) {
+  const ctx = document.getElementById('yoyChart');
+  charts.yoy = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: (yoy.current || []).map(p => p.period),
+      datasets: [
+        { label: 'This period', data: (yoy.current || []).map(p => p.combinedUS), backgroundColor: '#1a1d1f' },
+        { label: `Same period last year`, data: (yoy.prior || []).map(p => p.combinedUS), backgroundColor: '#d1d5db' }
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+function renderAgencyChart(rows) {
+  const ctx = document.getElementById('agencyChart');
+  const top = rows.slice(0, 25);
+  const chartHeight = Math.max(280, top.length * 22);
+  ctx.parentElement.style.height = chartHeight + 'px';
+  charts.agency = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.name),
+      datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#8b5cf6' }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+}
+
+function renderAccountChart(rows) {
+  const ctx = document.getElementById('accountChart');
+  const top = rows.slice(0, 15);
+  const chartHeight = Math.max(280, top.length * 22);
+  ctx.parentElement.style.height = chartHeight + 'px';
+  charts.account = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      // Canvas fillStyle cannot resolve CSS custom properties like 'var(--ny)' -
+      // that was silently falling back to black, which is why this chart looked
+      // like a solid black block. Using the actual hex value fixes it.
+      labels: top.map(r => r.name),
+      datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#2563eb' }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+}
+
+function renderCustomerChart(rows) {
+  const ctx = document.getElementById('customerChart');
+  const top = rows.slice(0, 15);
+  const chartHeight = Math.max(280, top.length * 22);
+  ctx.parentElement.style.height = chartHeight + 'px';
+  charts.customer = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.name),
+      datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#f59e0b' }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+}
+
+function renderYTDCompareTable(yoy) {
+  const current = yoy.current || [];
+  const prior = yoy.prior || [];
+
+  const categories = [
+    { label: 'Projects registered', combined: 'projectsRegistered', ny: 'projectsRegisteredNY', nj: 'projectsRegisteredNJ', isCount: true },
+    { label: 'Quote', combined: 'quoteAmount', ny: 'quoteAmountNY', nj: 'quoteAmountNJ' },
+    { label: 'CFM PO', combined: 'combinedUS', ny: 'nyCredit', nj: 'njCredit' },
+    { label: 'Shipped', combined: 'shippedAmount', ny: 'shippedAmountNY', nj: 'shippedAmountNJ' }
+  ];
+
+  const table = document.getElementById('ytdCompareTable');
+  const headerRow = `<tr>
+    <th>Category</th><th>Office</th>
+    <th>This year (YTD)</th><th>Same period last year</th><th>Change</th>
+  </tr>`;
+
+  const fmt = (v, isCount) => isCount ? Math.round(v).toLocaleString() : fmtUSD(v);
+
+  const bodyRows = categories.map(cat => {
+    const rows = [
+      { label: 'Combined', thisYear: sum(current, cat.combined), lastYear: sum(prior, cat.combined) },
+      { label: 'NY', thisYear: sum(current, cat.ny), lastYear: sum(prior, cat.ny) },
+      { label: 'NJ', thisYear: sum(current, cat.nj), lastYear: sum(prior, cat.nj) }
+    ];
+    return rows.map((r, i) => {
+      const pct = r.lastYear > 0 ? ((r.thisYear - r.lastYear) / r.lastYear * 100) : null;
+      const pctLabel = pct === null ? 'n/a' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+      const pctClass = pct === null ? '' : (pct >= 0 ? 'pos' : 'neg');
+      const catCell = i === 0 ? `<td rowspan="3" style="vertical-align:top; font-weight:500;">${cat.label}</td>` : '';
+      return `<tr>${catCell}
+        <td>${r.label}</td>
+        <td>${fmt(r.thisYear, cat.isCount)}</td>
+        <td>${fmt(r.lastYear, cat.isCount)}</td>
+        <td class="${pctClass}">${pctLabel}</td>
+      </tr>`;
+    }).join('');
+  }).join('');
+
+  table.innerHTML = headerRow + bodyRows;
+}
+
+// --- Table view toggle for chart cards --------------------------------
+// Builds a plain HTML table from {headers, rows} and swaps it with the
+// canvas when the card's "📊 Table" button is clicked.
+function buildTable(headers, rows) {
+  const head = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+  const body = rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  return `<table>${head}${body}</table>`;
+}
+
+function renderFunnelTable(data) {
+  document.getElementById('funnelTable').innerHTML = buildTable(
+    ['Period', 'Quote (latest)', 'Order PO', 'Shipped + ESD', 'Shipped (realized)'],
+    data.map(p => [p.period, fmtUSD(p.quoteAmount), fmtUSD(p.orderPOAmount), fmtUSD(p.shippedPlusESDAmount), fmtUSD(p.shippedAmount)])
+  );
+}
+function renderConversionTable(data) {
+  document.getElementById('conversionTable').innerHTML = buildTable(
+    ['Period', 'Quote → Order %', 'Order → Shipped %'],
+    data.map(p => [p.period, p.quoteToOrderConversion !== null ? (p.quoteToOrderConversion * 100).toFixed(1) + '%' : 'n/a', p.orderToShippedConversion !== null ? (p.orderToShippedConversion * 100).toFixed(1) + '%' : 'n/a'])
+  );
+}
+function renderAgencyTable(rows) {
+  document.getElementById('agencyTable').innerHTML = buildTable(
+    ['Agency', 'Order Value', 'Count'],
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
+  );
+}
+function renderAccountTable(rows) {
+  document.getElementById('accountTable').innerHTML = buildTable(
+    ['Account', 'Order Value', 'Count'],
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
+  );
+}
+function renderCustomerTable(rows) {
+  document.getElementById('customerTable').innerHTML = buildTable(
+    ['Customer', 'Order Value', 'Count'],
+    rows.map(r => [r.name, fmtUSD(r.amount), r.count])
+  );
+}
+function renderYoyTable(yoy) {
+  const current = yoy.current || [];
+  const prior = yoy.prior || [];
+  document.getElementById('yoyTable').innerHTML = buildTable(
+    ['Period', 'This period', 'Same period last year'],
+    current.map((p, i) => [p.period, fmtUSD(p.combinedUS), fmtUSD((prior[i] || {}).combinedUS)])
+  );
+}
+
+function renderAllTables() {
+  const { data, yoy, breakdown } = lastData;
+  renderFunnelTable(data);
+  renderConversionTable(data);
+  renderAgencyTable(breakdown.byAgency || []);
+  renderAccountTable(breakdown.byAccount || []);
+  renderCustomerTable(breakdown.byCustomer || []);
+  renderYoyTable(yoy);
+}
+
+document.querySelectorAll('.table-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.getAttribute('data-target');
+    const canvas = document.getElementById(target + 'Chart');
+    const tableDiv = document.getElementById(target + 'Table');
+    const showingTable = tableDiv.style.display !== 'none';
+    if (showingTable) {
+      tableDiv.style.display = 'none';
+      canvas.style.display = 'block';
+      btn.classList.remove('active');
+      btn.textContent = '📊 Table';
+    } else {
+      renderAllTables(); // refresh with latest data before showing
+      tableDiv.style.display = 'block';
+      canvas.style.display = 'none';
+      btn.classList.add('active');
+      btn.textContent = '📈 Chart';
+    }
+  });
+});
+
 document.getElementById('refresh').addEventListener('click', () => { destroyCharts(); loadDashboard(); });
-window.__authGuardReady.then(loadDashboard).catch(() => {});
+window.__authGuardReady.then(async () => {
+  await loadSettings();
+  await loadDashboard();
+}).catch(() => {});
 </script>
 </body>
 </html>
