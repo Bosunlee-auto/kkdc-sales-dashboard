@@ -157,10 +157,16 @@
     <div id="agencyTable" class="data-table" style="display:none;"></div>
   </div>
   <div class="chart-card">
-    <div class="chart-header"><h2>By account — top 15 (selected range)</h2><button class="table-toggle" data-target="account">📊 Table</button></div>
+    <div class="chart-header"><h2>By account — specifier/designer, top 15 (selected range)</h2><button class="table-toggle" data-target="account">📊 Table</button></div>
     <canvas id="accountChart"></canvas>
     <div id="accountTable" class="data-table" style="display:none;"></div>
   </div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>By customer — distributor/wholesaler, top 15 (selected range)</h2><button class="table-toggle" data-target="customer">📊 Table</button></div>
+  <canvas id="customerChart"></canvas>
+  <div id="customerTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="chart-card">
@@ -249,6 +255,7 @@ async function loadDashboard() {
   renderYTDCompareTable(yoy);
   renderAgencyChart(breakdown.byAgency || []);
   renderAccountChart(breakdown.byAccount || []);
+  renderCustomerChart(breakdown.byCustomer || []);
 }
 
 function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
@@ -408,6 +415,21 @@ function renderAccountChart(rows) {
   });
 }
 
+function renderCustomerChart(rows) {
+  const ctx = document.getElementById('customerChart');
+  const top = rows.slice(0, 15);
+  const chartHeight = Math.max(280, top.length * 22);
+  ctx.parentElement.style.height = chartHeight + 'px';
+  charts.customer = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.name),
+      datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#f59e0b' }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+}
+
 function renderYTDCompareTable(yoy) {
   const current = yoy.current || [];
   const prior = yoy.prior || [];
@@ -491,6 +513,13 @@ function renderAccountTable(rows) {
     top.map(r => [r.name, fmtUSD(r.amount), r.count])
   );
 }
+function renderCustomerTable(rows) {
+  const top = rows.slice(0, 15);
+  document.getElementById('customerTable').innerHTML = buildTable(
+    ['Customer', 'Order Value', 'Count'],
+    top.map(r => [r.name, fmtUSD(r.amount), r.count])
+  );
+}
 function renderYoyTable(yoy) {
   const current = yoy.current || [];
   const prior = yoy.prior || [];
@@ -507,6 +536,7 @@ function renderAllTables() {
   renderConversionTable(data);
   renderAgencyTable(breakdown.byAgency || []);
   renderAccountTable(breakdown.byAccount || []);
+  renderCustomerTable(breakdown.byCustomer || []);
   renderYoyTable(yoy);
 }
 
