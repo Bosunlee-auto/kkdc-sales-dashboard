@@ -1,5 +1,65 @@
 # KKDC Sales Performance Dashboard
 
+## 2026-08-23 update — 4 dashboards + login + margin/overage/tariff
+
+Added on top of the existing Phase 1+1.5 funnel dashboard (which is now the
+"Total Sales" page at `/index.html`):
+
+- **`/ny-sales.html`** and **`/nj-sales.html`** — office-level revenue using
+  `NY_Office_Full_Credit` / `NJ_Office_Full_Credit` (Sales_Orders). Overage
+  and margin are attributed proportionally to each office's share of
+  Quoted_Price (no per-office split field exists for either on Sales_Orders).
+- **`/total-invoice.html`** — the only dashboard using the full invoiced
+  `Amount` (freight/tariff/S&H included) instead of net product value. Margin
+  = Net_Product_Value1 − Cost of Goods (joined from the linked Sales_Order) −
+  Freight − Tariff (see schedule below).
+- **Login** (`/login.html`) — session-based, backed by a new CRM custom
+  module `Dashboard_Access` (fields: `Name` as login ID, `PIN_Code`,
+  `Allowed_Dashboards` comma-text of `NY,NJ,TOTAL_SALES,TOTAL_INVOICE`,
+  `Active`). Bosun manages users entirely in CRM UI — no redeploy needed to
+  add/remove someone or change what they can see. `lib/dashboardAccess.js`
+  caches the user list 2 minutes to avoid hammering Zoho on every login.
+
+### Overage (confirmed 2026-08-23)
+Overage is **not** included in `Quoted_Price`, `NY_Office_Full_Credit`, or
+`NJ_Office_Full_Credit` — verified live against real Sales_Orders records
+(Full_Credit == Quoted_Price exactly on solo orders with nonzero Overage).
+It's tracked as its own field and split 80/20:
+- `Overage_Payable` (Sales_Orders) = agency's 80% share
+- Company's 20% share = `Overage - Overage_Payable` (no dedicated field on
+  Sales_Orders)
+- Invoices module has ready-made formula fields for the same split:
+  `Overage_Agency_Share` / `Overage_Company_Share` — used directly for the
+  Total Invoice dashboard, no manual math needed there.
+
+### Tariff schedule (Total Invoice dashboard only)
+Rate applied to `Net_Product_Value1`, keyed by **Ship_Date** (not Invoice
+Date — confirmed explicitly with Bosun):
+
+| Window | Formula | Effective rate |
+|---|---|---|
+| 2025-04-01 – 2025-07-31 | Net Product Value × 0.5 × 0.10 | 5.0% |
+| 2025-08-01 – 2026-03-31 | Net Product Value × 0.5 × 0.189 | 9.45% |
+| 2026-04-01 – present | Net Product Value × 0.5 × 0.10 | 5.0% |
+
+Invoices with a Ship_Date before 2025-04-01, or with no linked Sales_Order
+(`Invoices.Sales_Order` lookup is null on some older records), are excluded
+from margin totals and surfaced as "Margin excluded" in the UI rather than
+estimated with a guess.
+
+### Known CRM data quirks hit while building this
+- `Sales_Orders.Status` field-metadata picklist (via `getFields`) returned
+  stale/wrong values (`Ready to ship`, `Cancelled_1`, etc.) that don't match
+  what's actually stored in records. Always verify against live COQL
+  (`select distinct Status from Sales_Orders where Status is not null`)
+  rather than trusting field metadata for picklists on this module.
+- COQL does not support `SUM(...)` with `GROUP BY` in this org (tested
+  2026-08-23, same conclusion as the original Phase 1 build) — all
+  aggregation in the new modules is done in JS after raw-row COQL, same
+  pattern as `salesPerformance.js`.
+
+
+
 Phase 1 + 1.5 build: funnel (Project → Quote → Order → Shipped), office split (NY/NJ),
 conversion rates, cancelled/lost pipeline line, YoY comparison.
 
