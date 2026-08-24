@@ -41,10 +41,10 @@
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
   .kpi {
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-    padding: 14px 16px;
+    padding: 10px 12px;
   }
-  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .kpi .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+  .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .kpi .value { font-size: 17px; font-weight: 600; margin-top: 3px; }
   .kpi .yoy { font-size: 12px; margin-top: 2px; }
   .yoy.up { color: var(--nj); }
   .yoy.down { color: var(--lost); }
@@ -100,7 +100,7 @@
 </div>
 
 <div class="kpi-row" id="kpiRow"></div>
-<div class="kpi-row" id="kpiRow2" style="grid-template-columns:repeat(3,1fr);"></div>
+<div class="kpi-row" id="kpiRow2"></div>
 
 <div class="chart-card">
   <div class="chart-header"><h2>Invoice total vs. net product value</h2><button class="table-toggle" data-target="invoice">📊 Table</button></div>
