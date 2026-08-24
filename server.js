@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
+const cookieParser = require('cookie-parser');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
 const { router: authRouter, requireDashboard } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
@@ -14,23 +14,11 @@ const app = express();
 // back "not logged in" because the cookie was never actually stored).
 app.set('trust proxy', 1);
 app.use(express.json());
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'kkdc-dashboard-dev-secret-change-in-railway-env',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 12 * 60 * 60 * 1000, // 12h - re-login once a day is fine for internal staff
-      // Required for the dashboard to work inside a Zoho CRM Web Tab
-      // (iframe on a different domain). Browsers treat the dashboard as
-      // third-party content there and drop the cookie unless it's
-      // explicitly marked SameSite=None + Secure. Direct browser-tab usage
-      // (not embedded) works fine either way.
-      sameSite: 'none',
-      secure: true
-    }
-  })
-);
+app.use(cookieParser());
+// NOTE (2026-08-24): express-session removed. Login state now lives in a
+// signed JWT cookie (see routes/auth.js) instead of server memory, so a
+// Railway redeploy no longer logs everyone out - only the cookie's own
+// ~6-month expiry or an explicit logout ends a session.
 app.use(express.static('public'));
 
 // Login / logout / session-check - backed by the Dashboard_Access CRM module
