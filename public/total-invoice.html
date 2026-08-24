@@ -2,27 +2,76 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC — Total Invoice</title>
+<title>KKDC Sales Performance — Total Invoice</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="/auth-guard.js"></script>
 <style>
-  :root { --ink:#1a1d1f; --muted:#6b7280; --line:#e5e7eb; --bg:#fafafa; --card:#fff; }
+  :root {
+    --ink: #1a1d1f;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --ny: #2563eb;
+    --nj: #059669;
+    --combined: #1a1d1f;
+    --lost: #dc2626;
+  }
   * { box-sizing: border-box; }
-  body { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); margin:0; padding:24px; }
-  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
-  .controls { display:flex; gap:12px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin-bottom:20px; }
-  .controls label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
-  select, input { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; background:var(--card); color:var(--ink); }
-  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px; }
-  .kpi { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
-  .kpi .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  .kpi .value { font-size:20px; font-weight:600; margin-top:4px; }
-  .chart-card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:20px; }
-  .chart-card h2 { font-size:13px; font-weight:600; margin:0 0 12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
-  canvas { max-height:320px; }
-  .note { font-size:12px; color:var(--muted); background:#fff9db; border:1px solid #f5e19b; border-radius:6px; padding:8px 12px; margin-bottom:20px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .controls {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;
+  }
+  .controls label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  select, input {
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 13px; background: var(--card); color: var(--ink);
+  }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+  .kpi .yoy { font-size: 12px; margin-top: 2px; }
+  .yoy.up { color: var(--nj); }
+  .yoy.down { color: var(--lost); }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .chart-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  canvas { max-height: 320px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .note {
+    font-size: 12px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b;
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 20px;
+  }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .chart-header h2 { margin: 0; }
+  .table-toggle {
+    font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .table-toggle:hover { border-color: var(--ink); color: var(--ink); }
+  .table-toggle.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .data-table { max-height: 340px; overflow: auto; }
+  .data-table table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
 </style>
 </head>
 <body data-dashboard="TOTAL_INVOICE">
@@ -45,38 +94,50 @@
       <option value="year">Year</option>
     </select>
   </label>
-  <label>&nbsp;<button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button></label>
+  <label>&nbsp;
+    <button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button>
+  </label>
 </div>
 
 <div class="kpi-row" id="kpiRow"></div>
 <div class="kpi-row" id="kpiRow2" style="grid-template-columns:repeat(3,1fr);"></div>
 
 <div class="chart-card">
-  <h2>Invoice total vs. net product value</h2>
+  <div class="chart-header"><h2>Invoice total vs. net product value</h2><button class="table-toggle" data-target="invoice">📊 Table</button></div>
   <canvas id="invoiceChart"></canvas>
+  <div id="invoiceTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="grid2">
   <div class="chart-card">
-    <h2>Overage — agency (80%) vs. KKDC (20%)</h2>
+    <div class="chart-header"><h2>Overage — agency (80%) vs. KKDC (20%)</h2><button class="table-toggle" data-target="overage">📊 Table</button></div>
     <canvas id="overageChart"></canvas>
+    <div id="overageTable" class="data-table" style="display:none;"></div>
   </div>
   <div class="chart-card">
-    <h2>Margin components</h2>
+    <div class="chart-header"><h2>Margin components</h2><button class="table-toggle" data-target="margin">📊 Table</button></div>
     <canvas id="marginChart"></canvas>
+    <div id="marginTable" class="data-table" style="display:none;"></div>
   </div>
 </div>
 
 <div class="chart-card">
-  <h2>Margin % over time</h2>
+  <div class="chart-header"><h2>Margin % over time</h2><button class="table-toggle" data-target="marginPct">📊 Table</button></div>
   <canvas id="marginPctChart"></canvas>
+  <div id="marginPctTable" class="data-table" style="display:none;"></div>
 </div>
 
 <script>
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
 document.getElementById('from').value = `${new Date().getFullYear()}-01-01`; // default: this year, Jan 1 to today
+
 const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+if (window.ChartDataLabels) {
+  Chart.register(ChartDataLabels);
+  Chart.defaults.set('plugins.datalabels', { display: false }); // opt-in per chart, not global default
+}
 let charts = {};
+let lastData = [];
 function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
 function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
 
@@ -88,6 +149,8 @@ async function loadDashboard() {
   const res = await fetch(`/api/dashboard/total-invoice?from=${from}&to=${to}&granularity=${granularity}`);
   const { data, error } = await res.json();
   if (error) { alert(error); return; }
+
+  lastData = data;
 
   renderKPIs(data);
   renderInvoiceChart(data);
@@ -109,7 +172,7 @@ function renderKPIs(data) {
     <div class="kpi"><div class="label">Invoice Total</div><div class="value">${fmtUSD(invoiceTotal)}</div></div>
     <div class="kpi"><div class="label">Net Product Value</div><div class="value">${fmtUSD(netProductValue)}</div></div>
     <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div></div>
-    <div class="kpi"><div class="label">Margin excluded (no SO / no tariff match)</div><div class="value" style="color:#dc2626;">${excludedCount} inv / ${fmtUSD(excludedValue)}</div></div>
+    <div class="kpi"><div class="label">Margin excluded (no SO / no tariff match)</div><div class="value" style="color:var(--lost);">${excludedCount} inv / ${fmtUSD(excludedValue)}</div></div>
   `;
   document.getElementById('kpiRow2').innerHTML = `
     <div class="kpi"><div class="label">Overage — Agency (80%)</div><div class="value">${fmtUSD(overageAgency)}</div></div>
@@ -130,26 +193,52 @@ function renderInvoiceChart(data) {
 }
 
 function renderOverageChart(data) {
+  const totals = data.map(p => (p.overageAgencyShare || 0) + (p.overageCompanyShare || 0));
   charts.overage = new Chart(document.getElementById('overageChart'), {
-    type: 'bar',
     data: { labels: data.map(p => p.period), datasets: [
-      { label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b' },
-      { label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f' }
+      { type: 'bar', label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b', stack: 'overage' },
+      { type: 'bar', label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f', stack: 'overage' },
+      { type: 'line', label: 'Total Overage', data: totals, borderColor: '#7c3aed', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7c3aed', fill: false }
     ]},
-    options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 24,
+          color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
+          font: { size: 10, weight: '600' },
+          formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        }
+      }
+    }
   });
 }
 
 function renderMarginChart(data) {
+  const totals = data.map(p => (p.costOfGoods || 0) + (p.freightTotal || 0) + (p.tariffTotal || 0) + (p.marginTotal || 0));
   charts.margin = new Chart(document.getElementById('marginChart'), {
-    type: 'bar',
     data: { labels: data.map(p => p.period), datasets: [
-      { label: 'Cost of Goods', data: data.map(p => p.costOfGoods), backgroundColor: '#6b7280' },
-      { label: 'Freight', data: data.map(p => p.freightTotal), backgroundColor: '#f59e0b' },
-      { label: 'Tariff', data: data.map(p => p.tariffTotal), backgroundColor: '#dc2626' },
-      { label: 'Margin', data: data.map(p => p.marginTotal), backgroundColor: '#059669' }
+      { type: 'bar', label: 'Cost of Goods', data: data.map(p => p.costOfGoods), backgroundColor: '#6b7280', stack: 'margin' },
+      { type: 'bar', label: 'Freight', data: data.map(p => p.freightTotal), backgroundColor: '#f59e0b', stack: 'margin' },
+      { type: 'bar', label: 'Tariff', data: data.map(p => p.tariffTotal), backgroundColor: '#dc2626', stack: 'margin' },
+      { type: 'bar', label: 'Margin', data: data.map(p => p.marginTotal), backgroundColor: '#059669', stack: 'margin' },
+      { type: 'line', label: 'Net Product Value', data: totals, borderColor: '#2563eb', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#2563eb', fill: false }
     ]},
-    options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 20,
+          color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
+          font: { size: 9, weight: '600' },
+          formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        }
+      }
+    }
   });
 }
 
@@ -162,6 +251,66 @@ function renderMarginPctChart(data) {
     options: { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } }
   });
 }
+
+// --- Table view toggle (same pattern as Total Sales / NY / NJ) -----------
+function buildTable(headers, rows) {
+  const head = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+  const body = rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  return `<table>${head}${body}</table>`;
+}
+
+function renderInvoiceTable(data) {
+  document.getElementById('invoiceTable').innerHTML = buildTable(
+    ['Period', 'Invoice Total', 'Net Product Value'],
+    data.map(p => [p.period, fmtUSD(p.invoiceTotal), fmtUSD(p.netProductValue)])
+  );
+}
+function renderOverageTable(data) {
+  document.getElementById('overageTable').innerHTML = buildTable(
+    ['Period', 'Agency (80%)', 'KKDC (20%)'],
+    data.map(p => [p.period, fmtUSD(p.overageAgencyShare), fmtUSD(p.overageCompanyShare)])
+  );
+}
+function renderMarginTable(data) {
+  document.getElementById('marginTable').innerHTML = buildTable(
+    ['Period', 'Cost of Goods', 'Freight', 'Tariff', 'Margin'],
+    data.map(p => [p.period, fmtUSD(p.costOfGoods), fmtUSD(p.freightTotal), fmtUSD(p.tariffTotal), fmtUSD(p.marginTotal)])
+  );
+}
+function renderMarginPctTable(data) {
+  document.getElementById('marginPctTable').innerHTML = buildTable(
+    ['Period', 'Margin %'],
+    data.map(p => [p.period, p.marginPct !== null && p.marginPct !== undefined ? p.marginPct.toFixed(1) + '%' : 'n/a'])
+  );
+}
+
+function renderAllTables() {
+  renderInvoiceTable(lastData);
+  renderOverageTable(lastData);
+  renderMarginTable(lastData);
+  renderMarginPctTable(lastData);
+}
+
+document.querySelectorAll('.table-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.getAttribute('data-target');
+    const canvas = document.getElementById(target + 'Chart');
+    const tableDiv = document.getElementById(target + 'Table');
+    const showingTable = tableDiv.style.display !== 'none';
+    if (showingTable) {
+      tableDiv.style.display = 'none';
+      canvas.style.display = 'block';
+      btn.classList.remove('active');
+      btn.textContent = '📊 Table';
+    } else {
+      renderAllTables();
+      tableDiv.style.display = 'block';
+      canvas.style.display = 'none';
+      btn.classList.add('active');
+      btn.textContent = '📈 Chart';
+    }
+  });
+});
 
 document.getElementById('refresh').addEventListener('click', () => { destroyCharts(); loadDashboard(); });
 window.__authGuardReady.then(loadDashboard).catch(() => {});
