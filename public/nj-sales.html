@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC Sales Performance — NY</title>
+<title>KKDC Sales Performance — NJ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
 <style>
@@ -125,10 +125,10 @@
   .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
-<body data-dashboard="NY">
+<body data-dashboard="NJ">
 
-<h1>KKDC Sales Performance — NY Sales</h1>
-<div class="sub">Project → Quote → Order → Shipped funnel, NY office only (NY_Office_Full_Credit basis)</div>
+<h1>KKDC Sales Performance — NJ Sales</h1>
+<div class="sub">Project → Quote → Order → Shipped funnel, NY office only (NJ_Office_Full_Credit basis)</div>
 
 <div class="note">
   Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.
@@ -157,13 +157,13 @@
 </div>
 
 <div class="chart-card" id="settingsPanel" style="display:none;">
-  <h2>NY Break Even Point &amp; Sales Quota — annual figure, auto-converted to the selected granularity</h2>
+  <h2>NJ Break Even Point &amp; Sales Quota — annual figure, auto-converted to the selected granularity</h2>
   <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:12px; max-width:500px;">
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
-      <input type="number" id="setNyBep" step="1000">
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
+      <input type="number" id="setNjBep" step="1000">
     </label>
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
-      <input type="number" id="setNyQuota" step="1000">
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
+      <input type="number" id="setNjQuota" step="1000">
     </label>
   </div>
   <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
@@ -173,14 +173,14 @@
 <div class="kpi-row" id="kpiRow"></div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <div class="chart-header"><h2>Funnel over time — NJ</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="chart-card">
   <div class="chart-header">
-    <h2>Quota &amp; BEP progress — NY</h2>
+    <h2>Quota &amp; BEP progress — NJ</h2>
     <span style="font-size:11px;color:var(--muted);">against ANNUAL targets, for the selected date range</span>
   </div>
   <div id="quotaProgress"></div>
@@ -212,7 +212,7 @@
 </div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Year-over-year — NY order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
+  <div class="chart-header"><h2>Year-over-year — NJ order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
   <canvas id="yoyChart"></canvas>
   <div id="yoyTable" class="data-table" style="display:none;"></div>
 </div>
@@ -243,16 +243,16 @@ function perPeriod(annual, granularity) {
 async function loadSettings() {
   const res = await fetch('/api/settings');
   settings = await res.json();
-  document.getElementById('setNyBep').value = settings.ny.bepAnnual;
-  document.getElementById('setNyQuota').value = settings.ny.quotaAnnual;
+  document.getElementById('setNjBep').value = settings.nj.bepAnnual;
+  document.getElementById('setNjQuota').value = settings.nj.quotaAnnual;
 }
 
 async function saveSettings() {
   // Backend requires both nj and ny in the payload - NJ's values are left
-  // untouched (not editable from this page), only NY is updated.
+  // untouched (not editable from this page), only NJ is updated.
   const body = {
     nj: settings.nj,
-    ny: { bepAnnual: Number(document.getElementById('setNyBep').value) || 0, quotaAnnual: Number(document.getElementById('setNyQuota').value) || 0 }
+    ny: { bepAnnual: Number(document.getElementById('setNjBep').value) || 0, quotaAnnual: Number(document.getElementById('setNjQuota').value) || 0 }
   };
   const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   settings = await res.json();
@@ -278,7 +278,7 @@ async function loadDashboard() {
   const from = document.getElementById('from').value;
   const to = document.getElementById('to').value;
   const granularity = document.getElementById('granularity').value;
-  const OFFICE = 'NY';
+  const OFFICE = 'NJ';
 
   const res = await fetch(`/api/sales-performance?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE}`);
   const { data } = await res.json();
@@ -347,7 +347,7 @@ function renderKPIs(data, yoy) {
   const poCountYoy = yoyBadge(pctChange(poCount, priorPoCount));
 
   document.getElementById('kpiRow').innerHTML = `
-    <div class="kpi"><div class="label">NY Revenue (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
+    <div class="kpi"><div class="label">NJ Revenue (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
     <div class="kpi"><div class="label">Total Quote</div><div class="value">${fmtUSD(quote)}</div></div>
     <div class="kpi"><div class="label">Shipped (realized)</div><div class="value">${fmtUSD(shipped)}</div></div>
     <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
@@ -362,8 +362,8 @@ function renderKPIs(data, yoy) {
 function renderFunnelChart(data) {
   const ctx = document.getElementById('funnelChart');
   const granularity = document.getElementById('granularity').value;
-  const nyBep = perPeriod(settings.ny.bepAnnual, granularity);
-  const nyQuota = perPeriod(settings.ny.quotaAnnual, granularity);
+  const nyBep = perPeriod(settings.nj.bepAnnual, granularity);
+  const nyQuota = perPeriod(settings.nj.quotaAnnual, granularity);
   const flat = (v) => data.map(() => v);
 
   charts.funnel = new Chart(ctx, {
@@ -375,8 +375,8 @@ function renderFunnelChart(data) {
         { label: 'Order PO', data: data.map(p => p.orderPOAmount), borderColor: '#f59e0b', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
         { label: 'Shipped + ESD', data: data.map(p => p.shippedPlusESDAmount), borderColor: '#8b5cf6', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
         { label: 'Shipped (realized)', data: data.map(p => p.shippedAmount), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
-        { label: 'NY BEP', data: flat(nyBep), borderColor: '#dc2626', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, yAxisID: 'y1' },
-        { label: 'NY Quota', data: flat(nyQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
+        { label: 'NJ BEP', data: flat(nyBep), borderColor: '#dc2626', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, yAxisID: 'y1' },
+        { label: 'NJ Quota', data: flat(nyQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
       ]
     },
     options: {
@@ -401,7 +401,7 @@ function renderFunnelChart(data) {
 
 function renderQuotaProgress(data) {
   const revenue = sum(data, 'shippedAmount');
-  const b = { name: 'NY', revenue, bep: settings.ny.bepAnnual, quota: settings.ny.quotaAnnual };
+  const b = { name: 'NJ', revenue, bep: settings.nj.bepAnnual, quota: settings.nj.quotaAnnual };
   document.getElementById('quotaProgress').innerHTML = `<div class="qp-row">${renderQuotaBar(b)}</div>`;
 }
 
@@ -444,7 +444,6 @@ function renderQuotaBar(b) {
       </div>
     </div>`;
 }
-
 
 function renderConversionChart(data) {
   const ctx = document.getElementById('conversionChart');
