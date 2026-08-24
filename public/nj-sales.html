@@ -248,6 +248,20 @@ async function loadDashboard() {
 
 function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
 
+function weeksBetween(fromStr, toStr) {
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  const days = Math.max(1, (to - from) / 86400000);
+  return days / 7;
+}
+function pctChange(curr, prior) {
+  return prior > 0 ? ((curr - prior) / prior * 100) : null;
+}
+function yoyBadge(pct) {
+  if (pct === null) return '';
+  return `<div class="yoy ${pct >= 0 ? 'up' : 'down'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% YoY</div>`;
+}
+
 function renderKPIs(data, yoy) {
   const combined = sum(data, 'combinedUS');
   const quote = sum(data, 'quoteAmount');
@@ -261,10 +275,20 @@ function renderKPIs(data, yoy) {
   const quoteCount = sum(data, 'quoteCount');
   const poCount = sum(data, 'orderPOCount');
 
+  const from = document.getElementById('from').value;
+  const to = document.getElementById('to').value;
+  const weeks = weeksBetween(from, to);
+  const perWeek = (n) => (weeks > 0 ? (n / weeks).toFixed(1) : '0.0');
+
   const priorCombined = sum(yoy.prior || [], 'combinedUS');
-  const yoyPct = priorCombined > 0 ? ((combined - priorCombined) / priorCombined * 100) : null;
-  const yoyLabel = yoyPct === null ? '' :
-    `<div class="yoy ${yoyPct >= 0 ? 'up' : 'down'}">${yoyPct >= 0 ? '▲' : '▼'} ${Math.abs(yoyPct).toFixed(1)}% YoY</div>`;
+  const yoyLabel = yoyBadge(pctChange(combined, priorCombined));
+
+  const priorProjects = sum(yoy.prior || [], 'projectsRegistered');
+  const priorQuoteCount = sum(yoy.prior || [], 'quoteCount');
+  const priorPoCount = sum(yoy.prior || [], 'orderPOCount');
+  const projectsYoy = yoyBadge(pctChange(projectsCount, priorProjects));
+  const quoteCountYoy = yoyBadge(pctChange(quoteCount, priorQuoteCount));
+  const poCountYoy = yoyBadge(pctChange(poCount, priorPoCount));
 
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi"><div class="label">NJ Revenue (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
@@ -273,9 +297,9 @@ function renderKPIs(data, yoy) {
     <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
     <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
     <div class="kpi"><div class="label">Lost Pipeline (Orders Cancelled)</div><div class="value" style="color:var(--lost)">${fmtUSD(lost)}</div></div>
-    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()}</div></div>
-    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()}</div></div>
-    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()}</div></div>
+    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(projectsCount)}/wk)</span></div>${projectsYoy}</div>
+    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(quoteCount)}/wk)</span></div>${quoteCountYoy}</div>
+    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(poCount)}/wk)</span></div>${poCountYoy}</div>
   `;
 }
 
