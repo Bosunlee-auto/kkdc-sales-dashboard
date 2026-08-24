@@ -76,6 +76,42 @@
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
   .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
+  .qp-row { display: flex; flex-direction: column; gap: 22px; }
+  .qp-office { }
+  .qp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .qp-office-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .qp-stat { font-size: 13px; color: var(--muted); }
+  .qp-stat b { color: var(--ink); font-weight: 600; }
+  .qp-track {
+    position: relative; height: 34px; border-radius: 8px; overflow: hidden;
+    background: linear-gradient(to right, #fee2e2 var(--bep-pct), #dcfce7 var(--bep-pct));
+    border: 1px solid var(--line);
+  }
+  .qp-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--fill-color, #2563eb);
+    transition: width 0.4s ease;
+    display: flex; align-items: center; justify-content: flex-end;
+    min-width: 2px;
+  }
+  .qp-fill-label {
+    font-size: 11px; font-weight: 600; color: #fff; padding-right: 8px;
+    white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .qp-marker {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: #1a1d1f;
+  }
+  .qp-marker-label {
+    position: absolute; top: -20px; font-size: 10px; color: var(--muted);
+    transform: translateX(-50%); white-space: nowrap;
+  }
+  .qp-overflow-badge {
+    display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px;
+    background: #dcfce7; color: #059669; font-size: 11px; font-weight: 600;
+  }
+  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
 <body data-dashboard="TOTAL_SALES">
@@ -137,17 +173,18 @@
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
 
-<div class="grid2">
-  <div class="chart-card">
-    <div class="chart-header"><h2>Office split — order value</h2><button class="table-toggle" data-target="office">📊 Table</button></div>
-    <canvas id="officeChart"></canvas>
-    <div id="officeTable" class="data-table" style="display:none;"></div>
+<div class="chart-card">
+  <div class="chart-header">
+    <h2>Quota &amp; BEP progress — NY / NJ</h2>
+    <span style="font-size:11px;color:var(--muted);">against ANNUAL targets, for the selected date range</span>
   </div>
-  <div class="chart-card">
-    <div class="chart-header"><h2>Conversion rate — quote to order, order to shipped</h2><button class="table-toggle" data-target="conversion">📊 Table</button></div>
-    <canvas id="conversionChart"></canvas>
-    <div id="conversionTable" class="data-table" style="display:none;"></div>
-  </div>
+  <div id="quotaProgress"></div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>Conversion rate — quote to order, order to shipped</h2><button class="table-toggle" data-target="conversion">📊 Table</button></div>
+  <canvas id="conversionChart"></canvas>
+  <div id="conversionTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="grid2">
@@ -250,7 +287,7 @@ async function loadDashboard() {
 
   renderKPIs(data, yoy);
   renderFunnelChart(data);
-  renderOfficeChart(data);
+  renderQuotaProgress(data);
   renderConversionChart(data);
   renderYoYChart(yoy);
   renderYTDCompareTable(yoy);
@@ -360,30 +397,58 @@ function renderFunnelChart(data) {
   });
 }
 
-function renderOfficeChart(data) {
-  const ctx = document.getElementById('officeChart');
-  const granularity = document.getElementById('granularity').value;
-  const njBep = perPeriod(settings.nj.bepAnnual, granularity);
-  const njQuota = perPeriod(settings.nj.quotaAnnual, granularity);
-  const nyBep = perPeriod(settings.ny.bepAnnual, granularity);
-  const nyQuota = perPeriod(settings.ny.quotaAnnual, granularity);
-  const flat = (v) => data.map(() => v);
+function renderQuotaProgress(data) {
+  const nyRevenue = sum(data, 'nyCredit');
+  const njRevenue = sum(data, 'njCredit');
 
-  charts.office = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: data.map(p => p.period),
-      datasets: [
-        { label: 'NY', data: data.map(p => p.nyCredit), borderColor: '#2563eb', backgroundColor: '#2563eb', borderWidth: 2, pointRadius: 3, tension: 0.2 },
-        { label: 'NJ', data: data.map(p => p.njCredit), borderColor: '#059669', backgroundColor: '#059669', borderWidth: 2, pointRadius: 3, tension: 0.2 },
-        { label: 'NY BEP', data: flat(nyBep), borderColor: '#93c5fd', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 },
-        { label: 'NY Quota', data: flat(nyQuota), borderColor: '#1d4ed8', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0 },
-        { label: 'NJ BEP', data: flat(njBep), borderColor: '#86efac', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 },
-        { label: 'NJ Quota', data: flat(njQuota), borderColor: '#047857', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0 }
-      ]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-  });
+  const bars = [
+    { name: 'NY', revenue: nyRevenue, bep: settings.ny.bepAnnual, quota: settings.ny.quotaAnnual, color: '#2563eb' },
+    { name: 'NJ', revenue: njRevenue, bep: settings.nj.bepAnnual, quota: settings.nj.quotaAnnual, color: '#059669' }
+  ];
+
+  const html = bars.map((b) => {
+    const quota = b.quota > 0 ? b.quota : 1; // avoid div-by-zero if not yet configured
+    const bepPct = Math.min(100, (b.bep / quota) * 100);
+    const rawPct = (b.revenue / quota) * 100;
+    const fillPct = Math.min(100, Math.max(0, rawPct));
+    const overflow = rawPct > 100;
+
+    // Three-state color: red below BEP, amber between BEP and Quota, green at/above Quota.
+    let fillColor = '#dc2626'; // below BEP
+    let statusText = `<b style="color:#dc2626;">${fmtUSD(b.bep - b.revenue)}</b> short of break-even`;
+    if (b.revenue >= quota) {
+      fillColor = '#059669';
+      statusText = `<b style="color:#059669;">Quota reached</b> — ${fmtUSD(b.revenue - quota)} over target`;
+    } else if (b.revenue >= b.bep) {
+      fillColor = '#f59e0b';
+      statusText = `Past break-even — <b>${fmtUSD(quota - b.revenue)}</b> to Quota`;
+    }
+
+    return `
+      <div class="qp-office">
+        <div class="qp-header">
+          <div class="qp-office-name">${b.name}</div>
+          <div class="qp-stat">${fmtUSD(b.revenue)} / ${fmtUSD(quota)} Quota (<b>${rawPct.toFixed(0)}%</b>)${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
+        </div>
+        <div class="qp-track" style="--bep-pct:${bepPct}%;">
+          <div class="qp-marker" style="left:${bepPct}%;"></div>
+          <div class="qp-marker-label" style="left:${bepPct}%;">BEP ${fmtUSD(b.bep)}</div>
+          <div class="qp-fill" style="width:${fillPct}%; --fill-color:${fillColor}; background:${fillColor};">
+            <span class="qp-fill-label">${fillPct > 12 ? fmtUSD(b.revenue) : ''}</span>
+          </div>
+        </div>
+        <div class="qp-stat" style="margin-top:6px;">${statusText}</div>
+      </div>`;
+  }).join('');
+
+  const legend = `
+    <div class="qp-legend">
+      <span><i style="background:#fee2e2;"></i>Pre-break-even zone</span>
+      <span><i style="background:#dcfce7;"></i>Break-even → Quota zone</span>
+      <span><i style="background:#1a1d1f;width:2px;height:14px;border-radius:0;"></i>BEP marker</span>
+    </div>`;
+
+  document.getElementById('quotaProgress').innerHTML = `<div class="qp-row">${html}</div>${legend}`;
 }
 
 function renderConversionChart(data) {
@@ -521,12 +586,6 @@ function renderFunnelTable(data) {
     data.map(p => [p.period, fmtUSD(p.quoteAmount), fmtUSD(p.orderPOAmount), fmtUSD(p.shippedPlusESDAmount), fmtUSD(p.shippedAmount)])
   );
 }
-function renderOfficeTable(data) {
-  document.getElementById('officeTable').innerHTML = buildTable(
-    ['Period', 'NY', 'NJ'],
-    data.map(p => [p.period, fmtUSD(p.nyCredit), fmtUSD(p.njCredit)])
-  );
-}
 function renderConversionTable(data) {
   document.getElementById('conversionTable').innerHTML = buildTable(
     ['Period', 'Quote → Order %', 'Order → Shipped %'],
@@ -563,7 +622,6 @@ function renderYoyTable(yoy) {
 function renderAllTables() {
   const { data, yoy, breakdown } = lastData;
   renderFunnelTable(data);
-  renderOfficeTable(data);
   renderConversionTable(data);
   renderAgencyTable(breakdown.byAgency || []);
   renderAccountTable(breakdown.byAccount || []);
