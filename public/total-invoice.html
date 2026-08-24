@@ -38,13 +38,13 @@
     padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
     font-size: 13px; background: var(--card); color: var(--ink);
   }
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 12px; }
   .kpi {
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
   .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .kpi .value { font-size: 17px; font-weight: 600; margin-top: 3px; }
+  .kpi .value { font-size: 14px; font-weight: 600; margin-top: 3px; }
   .kpi .yoy { font-size: 12px; margin-top: 2px; }
   .yoy.up { color: var(--nj); }
   .yoy.down { color: var(--lost); }
@@ -180,20 +180,28 @@ async function loadDashboard() {
 
 function renderKPIs(data) {
   const invoiceTotal = sum(data, 'invoiceTotal');
+  const invoiceTotalNY = sum(data, 'invoiceTotalNY');
+  const invoiceTotalNJ = sum(data, 'invoiceTotalNJ');
   const netProductValue = sum(data, 'netProductValue');
   const overageAgency = sum(data, 'overageAgencyShare');
   const overageCompany = sum(data, 'overageCompanyShare');
   const margin = sum(data, 'marginTotal');
+  const marginNY = sum(data, 'marginTotalNY');
+  const marginNJ = sum(data, 'marginTotalNJ');
   const excludedCount = sum(data, 'marginExcludedCount');
   const excludedValue = sum(data, 'marginExcludedValue');
 
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi"><div class="label">Invoice Total</div><div class="value">${fmtUSD(invoiceTotal)}</div></div>
+    <div class="kpi"><div class="label">Invoice Total — NY</div><div class="value">${fmtUSD(invoiceTotalNY)}</div></div>
+    <div class="kpi"><div class="label">Invoice Total — NJ</div><div class="value">${fmtUSD(invoiceTotalNJ)}</div></div>
     <div class="kpi"><div class="label">Net Product Value</div><div class="value">${fmtUSD(netProductValue)}</div></div>
-    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div></div>
     <div class="kpi"><div class="label">Margin excluded (no SO / no tariff match)</div><div class="value" style="color:var(--lost);">${excludedCount} inv / ${fmtUSD(excludedValue)}</div></div>
   `;
   document.getElementById('kpiRow2').innerHTML = `
+    <div class="kpi"><div class="label">Margin — Total</div><div class="value">${fmtUSD(margin)}</div></div>
+    <div class="kpi"><div class="label">Margin — NY</div><div class="value">${fmtUSD(marginNY)}</div></div>
+    <div class="kpi"><div class="label">Margin — NJ</div><div class="value">${fmtUSD(marginNJ)}</div></div>
     <div class="kpi"><div class="label">Overage — Agency (80%)</div><div class="value">${fmtUSD(overageAgency)}</div></div>
     <div class="kpi"><div class="label">Overage — KKDC (20%)</div><div class="value">${fmtUSD(overageCompany)}</div></div>
     <div class="kpi"><div class="label">Cost + Freight + Tariff</div><div class="value">${fmtUSD(sum(data,'costOfGoods')+sum(data,'freightTotal')+sum(data,'tariffTotal'))}</div></div>
