@@ -450,7 +450,7 @@ function renderQuotaBar(b) {
     <div class="qp-office">
       <div class="qp-header">
         <div class="qp-office-name">${b.name}</div>
-        <div class="qp-stat">Shipped ${fmtUSD(b.revenue)} of ${fmtUSD(quota)} Quota (<b>${rawPct.toFixed(0)}%</b>)${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
+        <div class="qp-stat"><b>${rawPct.toFixed(0)}%</b> of Quota${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
       </div>
       <div class="qp-track">
         <div class="qp-fill" style="width:${fillPct}%;">
