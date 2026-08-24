@@ -42,24 +42,34 @@
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
   .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
-  .qp-row { display: flex; flex-direction: column; gap: 34px; }
-  .qp-office { padding-top: 26px; }
-  .qp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
-  .qp-office-name { font-size: 14px; font-weight: 600; color: var(--ink); }
-  .qp-stat { font-size: 13px; color: var(--muted); }
-  .qp-stat b { color: var(--ink); font-weight: 600; }
-  .qp-track { position: relative; height: 30px; border-radius: 8px; overflow: visible; background: #f1f2f4; border: 1px solid var(--line); }
-  .qp-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 8px 0 0 8px; background: #f59e0b; transition: width 0.4s ease; display: flex; align-items: center; justify-content: flex-end; min-width: 2px; overflow: hidden; }
-  .qp-fill-label { font-size: 11px; font-weight: 700; color: #fff; padding-right: 8px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
-  .qp-gap-label { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap; pointer-events: none; }
-  .qp-flag { position: absolute; top: -2px; transform: translateX(-50%); text-align: center; }
-  .qp-flag-tri { width: 0; height: 0; margin: 0 auto; border-left: 6px solid transparent; border-right: 6px solid transparent; }
-  .qp-flag.bep .qp-flag-tri { border-top: 8px solid #1a1d1f; }
-  .qp-flag.quota .qp-flag-tri { border-top: 8px solid #7c3aed; }
-  .qp-flag-label { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .qp-row { display: flex; flex-direction: column; gap: 30px; }
+  .qp-office { }
+  .qp-office-name { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .qp-refs { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .qp-refs b { color: var(--ink); font-weight: 600; }
+  .qp-metrics { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
+  .qp-metrics th { text-align: right; font-weight: 500; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 8px 6px; border-bottom: 1px solid var(--line); }
+  .qp-metrics th:first-child { text-align: left; }
+  .qp-metrics td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+  .qp-metrics td:first-child { text-align: left; font-weight: 600; color: var(--muted); }
+  .qp-metrics tr:last-child td { border-bottom: none; }
+  .qp-metrics .amt { font-weight: 700; }
+  .qp-metrics .pct { color: var(--ink); font-weight: 600; }
+  .qp-metrics .short { color: var(--lost); font-weight: 400; font-size: 11px; }
+  .qp-metrics .over { color: var(--nj); font-weight: 400; font-size: 11px; }
+  .qp-track { position: relative; height: 22px; border-radius: 6px; overflow: visible; background: #f1f2f4; border: 1px solid var(--line); }
+  .qp-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px 0 0 6px; background: #f59e0b; transition: width 0.4s ease; min-width: 2px; }
+  .qp-fill-esd { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px 0 0 6px; background: #fde3ad; transition: width 0.4s ease; z-index: 1; }
+  .qp-flag { position: absolute; top: -2px; transform: translateX(-50%); text-align: center; z-index: 2; }
+  .qp-flag-tri { width: 0; height: 0; margin: 0 auto; border-left: 5px solid transparent; border-right: 5px solid transparent; }
+  .qp-flag.bep .qp-flag-tri { border-top: 7px solid #1a1d1f; }
+  .qp-flag.quota .qp-flag-tri { border-top: 7px solid #7c3aed; }
+  .qp-flag-label { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 600; white-space: nowrap; }
   .qp-flag.bep .qp-flag-label { color: #1a1d1f; }
   .qp-flag.quota .qp-flag-label { color: #7c3aed; }
-  .qp-overflow-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px; background: #dcfce7; color: #059669; font-size: 11px; font-weight: 600; }
+  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
 <body data-dashboard="NY">
@@ -300,33 +310,61 @@ function renderFunnelChart(data) {
 }
 
 function renderQuotaProgress(data) {
-  const revenue = sum(data, 'shippedAmount');
-  const bep = settings.bepAnnual;
+  const shipped = sum(data, 'shippedAmount');
+  const shippedESD = sum(data, 'shippedPlusESDAmount');
+  const quote = sum(data, 'quoteAmount');
+  const bep = settings.bepAnnual || 0;
   const quota = settings.quotaAnnual > 0 ? settings.quotaAnnual : 1;
   const bepPct = Math.min(100, (bep / quota) * 100);
-  const rawPct = (revenue / quota) * 100;
-  const fillPct = Math.min(100, Math.max(0, rawPct));
-  const overflow = rawPct > 100;
 
-  let gapLabelHtml = '';
-  if (revenue < bep) {
-    gapLabelHtml = `<div class="qp-gap-label" style="left:${(fillPct + bepPct) / 2}%;">${fmtUSD(bep - revenue)} to BEP</div>`;
-  } else if (revenue < quota) {
-    gapLabelHtml = `<div class="qp-gap-label" style="left:${(fillPct + 100) / 2}%;">${fmtUSD(quota - revenue)} to Quota</div>`;
-  }
+  const fmtPct = (v) => (isFinite(v) ? v.toFixed(0) + '%' : 'n/a');
+  const vsRef = (amount, ref) => {
+    if (!ref || ref <= 0) return { pct: null, diff: 0 };
+    return { pct: (amount / ref) * 100, diff: ref - amount };
+  };
+  const shipVsBep = vsRef(shipped, bep);
+  const shipVsQuota = vsRef(shipped, quota);
+  const shipVsQuote = vsRef(shipped, quote);
+  const esdVsBep = vsRef(shippedESD, bep);
+  const esdVsQuota = vsRef(shippedESD, quota);
+  const esdVsQuote = vsRef(shippedESD, quote);
+
+  const cell = (v) => {
+    if (v.pct === null) return '<td>n/a</td>';
+    const diffLabel = v.diff > 0
+      ? `<br><span class="short">${fmtUSD(v.diff)} short</span>`
+      : (v.diff < 0 ? `<br><span class="over">+${fmtUSD(-v.diff)} over</span>` : '');
+    return `<td><span class="pct">${fmtPct(v.pct)}</span>${diffLabel}</td>`;
+  };
+
+  const fillPct = Math.min(100, Math.max(0, (shipped / quota) * 100));
+  const fillEsdPct = Math.min(100, Math.max(0, (shippedESD / quota) * 100));
 
   document.getElementById('quotaProgress').innerHTML = `
     <div class="qp-row">
       <div class="qp-office">
-        <div class="qp-header">
-          <div class="qp-office-name">${OFFICE_KEY}</div>
-          <div class="qp-stat"><b>${rawPct.toFixed(0)}%</b> of Quota${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
-        </div>
+        <div class="qp-office-name">${OFFICE_KEY}</div>
+        <div class="qp-refs">BEP <b>${fmtUSD(bep)}</b> &nbsp;·&nbsp; Quota <b>${fmtUSD(quota)}</b> &nbsp;·&nbsp; Quote <b>${fmtUSD(quote)}</b></div>
+        <table class="qp-metrics">
+          <tr><th>Metric</th><th>Amount</th><th>vs BEP</th><th>vs Quota</th><th>vs Quote</th></tr>
+          <tr>
+            <td>Shipped</td><td class="amt">${fmtUSD(shipped)}</td>
+            ${cell(shipVsBep)}${cell(shipVsQuota)}${cell(shipVsQuote)}
+          </tr>
+          <tr>
+            <td>Shipped + ESD</td><td class="amt">${fmtUSD(shippedESD)}</td>
+            ${cell(esdVsBep)}${cell(esdVsQuota)}${cell(esdVsQuote)}
+          </tr>
+        </table>
         <div class="qp-track">
-          <div class="qp-fill" style="width:${fillPct}%;"><span class="qp-fill-label">${fillPct > 12 ? fmtUSD(revenue) : ''}</span></div>
-          ${gapLabelHtml}
-          <div class="qp-flag bep" style="left:${bepPct}%;"><div class="qp-flag-label">BEP ${fmtUSD(bep)}</div><div class="qp-flag-tri"></div></div>
-          <div class="qp-flag quota" style="left:100%;"><div class="qp-flag-label">Quota ${fmtUSD(quota)}</div><div class="qp-flag-tri"></div></div>
+          <div class="qp-fill-esd" style="width:${fillEsdPct}%;"></div>
+          <div class="qp-fill" style="width:${fillPct}%;"></div>
+          <div class="qp-flag bep" style="left:${bepPct}%;"><div class="qp-flag-label">BEP</div><div class="qp-flag-tri"></div></div>
+          <div class="qp-flag quota" style="left:100%;"><div class="qp-flag-label">Quota</div><div class="qp-flag-tri"></div></div>
+        </div>
+        <div class="qp-legend">
+          <span><i style="background:#f59e0b;"></i>Shipped</span>
+          <span><i style="background:#fde3ad;"></i>Shipped + ESD</span>
         </div>
       </div>
     </div>`;
