@@ -73,9 +73,20 @@
   .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
   .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .spinner-overlay {
+    position: fixed; inset: 0; background: rgba(250,250,250,0.7);
+    display: none; align-items: center; justify-content: center; z-index: 9999;
+  }
+  .spinner-overlay.active { display: flex; }
+  .spinner {
+    width: 36px; height: 36px; border: 4px solid var(--line); border-top-color: var(--ink);
+    border-radius: 50%; animation: kkdc-spin 0.8s linear infinite;
+  }
+  @keyframes kkdc-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body data-dashboard="NJ">
+<div class="spinner-overlay" id="spinnerOverlay"><div class="spinner"></div></div>
 
 <h1>KKDC Sales Performance <span class="office-badge">OFFICE: NJ</span></h1>
 <div class="sub">Project → Quote → Order → Shipped funnel, NJ office only</div>
@@ -220,30 +231,38 @@ document.getElementById('settingsToggle').addEventListener('click', () => {
 });
 document.getElementById('saveSettings').addEventListener('click', saveSettings);
 
+function showSpinner() { document.getElementById('spinnerOverlay').classList.add('active'); }
+function hideSpinner() { document.getElementById('spinnerOverlay').classList.remove('active'); }
+
 async function loadDashboard() {
-  const from = document.getElementById('from').value;
-  const to = document.getElementById('to').value;
-  const granularity = document.getElementById('granularity').value;
+  showSpinner();
+  try {
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    const granularity = document.getElementById('granularity').value;
 
-  const res = await fetch(`/api/sales-performance?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE_KEY}`);
-  const { data } = await res.json();
+    const res = await fetch(`/api/sales-performance?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE_KEY}`);
+    const { data } = await res.json();
 
-  const yoyRes = await fetch(`/api/sales-performance/yoy?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE_KEY}`);
-  const yoy = await yoyRes.json();
+    const yoyRes = await fetch(`/api/sales-performance/yoy?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE_KEY}`);
+    const yoy = await yoyRes.json();
 
-  const breakdownRes = await fetch(`/api/sales-performance/breakdown?from=${from}&to=${to}&office=${OFFICE_KEY}`);
-  const breakdown = await breakdownRes.json();
+    const breakdownRes = await fetch(`/api/sales-performance/breakdown?from=${from}&to=${to}&office=${OFFICE_KEY}`);
+    const breakdown = await breakdownRes.json();
 
-  lastData = { data, yoy, breakdown };
+    lastData = { data, yoy, breakdown };
 
-  renderKPIs(data, yoy);
-  renderFunnelChart(data);
-  renderQuotaProgress(data);
-  renderConversionChart(data);
-  renderYoYChart(yoy);
-  renderAgencyChart(breakdown.byAgency || []);
-  renderAccountChart(breakdown.byAccount || []);
-  renderCustomerChart(breakdown.byCustomer || []);
+    renderKPIs(data, yoy);
+    renderFunnelChart(data);
+    renderQuotaProgress(data);
+    renderConversionChart(data);
+    renderYoYChart(yoy);
+    renderAgencyChart(breakdown.byAgency || []);
+    renderAccountChart(breakdown.byAccount || []);
+    renderCustomerChart(breakdown.byCustomer || []);
+  } finally {
+    hideSpinner();
+  }
 }
 
 function renderKPIs(data, yoy) {
@@ -489,3 +508,4 @@ window.__authGuardReady.then(async () => {
 </script>
 </body>
 </html>
+
