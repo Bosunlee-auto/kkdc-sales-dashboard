@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC Sales Performance — NJ</title>
+<title>KKDC Sales Performance — NY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
 <style>
@@ -76,48 +76,59 @@
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
   .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
-  .qp-row { display: flex; flex-direction: column; gap: 22px; }
-  .qp-office { }
+  .qp-row { display: flex; flex-direction: column; gap: 34px; }
+  .qp-office { padding-top: 22px; }
   .qp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
   .qp-office-name { font-size: 14px; font-weight: 600; color: var(--ink); }
   .qp-stat { font-size: 13px; color: var(--muted); }
   .qp-stat b { color: var(--ink); font-weight: 600; }
   .qp-track {
-    position: relative; height: 34px; border-radius: 8px; overflow: hidden;
-    background: linear-gradient(to right, #fee2e2 var(--bep-pct), #dcfce7 var(--bep-pct));
+    position: relative; height: 30px; border-radius: 8px; overflow: visible;
+    background: #f1f2f4;
     border: 1px solid var(--line);
   }
   .qp-fill {
-    position: absolute; top: 0; left: 0; height: 100%;
-    background: var(--fill-color, #2563eb);
+    position: absolute; top: 0; left: 0; height: 100%; border-radius: 8px 0 0 8px;
+    background: #f59e0b;
     transition: width 0.4s ease;
     display: flex; align-items: center; justify-content: flex-end;
-    min-width: 2px;
+    min-width: 2px; overflow: hidden;
   }
   .qp-fill-label {
-    font-size: 11px; font-weight: 600; color: #fff; padding-right: 8px;
+    font-size: 11px; font-weight: 700; color: #fff; padding-right: 8px;
     white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
   }
-  .qp-marker {
-    position: absolute; top: 0; bottom: 0; width: 2px; background: #1a1d1f;
+  .qp-gap-label {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap;
+    pointer-events: none;
   }
-  .qp-marker-label {
-    position: absolute; top: -20px; font-size: 10px; color: var(--muted);
-    transform: translateX(-50%); white-space: nowrap;
+  .qp-flag { position: absolute; top: -2px; transform: translateX(-50%); text-align: center; }
+  .qp-flag-tri {
+    width: 0; height: 0; margin: 0 auto;
+    border-left: 6px solid transparent; border-right: 6px solid transparent;
   }
+  .qp-flag.bep .qp-flag-tri { border-top: 8px solid #1a1d1f; }
+  .qp-flag.quota .qp-flag-tri { border-top: 8px solid #7c3aed; }
+  .qp-flag-label {
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 600; white-space: nowrap;
+  }
+  .qp-flag.bep .qp-flag-label { color: #1a1d1f; }
+  .qp-flag.quota .qp-flag-label { color: #7c3aed; }
   .qp-overflow-badge {
     display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px;
     background: #dcfce7; color: #059669; font-size: 11px; font-weight: 600;
   }
-  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .qp-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--muted); }
   .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
-<body data-dashboard="NJ">
+<body data-dashboard="NY">
 
-<h1>KKDC Sales Performance — NJ Sales</h1>
-<div class="sub">Project → Quote → Order → Shipped funnel, NY office only (NJ_Office_Full_Credit basis)</div>
+<h1>KKDC Sales Performance — NY Sales</h1>
+<div class="sub">Project → Quote → Order → Shipped funnel, NY office only (NY_Office_Full_Credit basis)</div>
 
 <div class="note">
   Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.
@@ -146,13 +157,13 @@
 </div>
 
 <div class="chart-card" id="settingsPanel" style="display:none;">
-  <h2>NJ Break Even Point &amp; Sales Quota — annual figure, auto-converted to the selected granularity</h2>
+  <h2>NY Break Even Point &amp; Sales Quota — annual figure, auto-converted to the selected granularity</h2>
   <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:12px; max-width:500px;">
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
-      <input type="number" id="setNjBep" step="1000">
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
+      <input type="number" id="setNyBep" step="1000">
     </label>
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
-      <input type="number" id="setNjQuota" step="1000">
+    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
+      <input type="number" id="setNyQuota" step="1000">
     </label>
   </div>
   <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
@@ -162,14 +173,14 @@
 <div class="kpi-row" id="kpiRow"></div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Funnel over time — NJ</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
 
 <div class="chart-card">
   <div class="chart-header">
-    <h2>Quota &amp; BEP progress — NJ</h2>
+    <h2>Quota &amp; BEP progress — NY</h2>
     <span style="font-size:11px;color:var(--muted);">against ANNUAL targets, for the selected date range</span>
   </div>
   <div id="quotaProgress"></div>
@@ -201,7 +212,7 @@
 </div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Year-over-year — NJ order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
+  <div class="chart-header"><h2>Year-over-year — NY order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
   <canvas id="yoyChart"></canvas>
   <div id="yoyTable" class="data-table" style="display:none;"></div>
 </div>
@@ -232,16 +243,16 @@ function perPeriod(annual, granularity) {
 async function loadSettings() {
   const res = await fetch('/api/settings');
   settings = await res.json();
-  document.getElementById('setNjBep').value = settings.nj.bepAnnual;
-  document.getElementById('setNjQuota').value = settings.nj.quotaAnnual;
+  document.getElementById('setNyBep').value = settings.ny.bepAnnual;
+  document.getElementById('setNyQuota').value = settings.ny.quotaAnnual;
 }
 
 async function saveSettings() {
   // Backend requires both nj and ny in the payload - NJ's values are left
-  // untouched (not editable from this page), only NJ is updated.
+  // untouched (not editable from this page), only NY is updated.
   const body = {
     nj: settings.nj,
-    ny: { bepAnnual: Number(document.getElementById('setNjBep').value) || 0, quotaAnnual: Number(document.getElementById('setNjQuota').value) || 0 }
+    ny: { bepAnnual: Number(document.getElementById('setNyBep').value) || 0, quotaAnnual: Number(document.getElementById('setNyQuota').value) || 0 }
   };
   const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   settings = await res.json();
@@ -267,7 +278,7 @@ async function loadDashboard() {
   const from = document.getElementById('from').value;
   const to = document.getElementById('to').value;
   const granularity = document.getElementById('granularity').value;
-  const OFFICE = 'NJ';
+  const OFFICE = 'NY';
 
   const res = await fetch(`/api/sales-performance?from=${from}&to=${to}&granularity=${granularity}&office=${OFFICE}`);
   const { data } = await res.json();
@@ -336,7 +347,7 @@ function renderKPIs(data, yoy) {
   const poCountYoy = yoyBadge(pctChange(poCount, priorPoCount));
 
   document.getElementById('kpiRow').innerHTML = `
-    <div class="kpi"><div class="label">NJ Revenue (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
+    <div class="kpi"><div class="label">NY Revenue (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
     <div class="kpi"><div class="label">Total Quote</div><div class="value">${fmtUSD(quote)}</div></div>
     <div class="kpi"><div class="label">Shipped (realized)</div><div class="value">${fmtUSD(shipped)}</div></div>
     <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
@@ -351,8 +362,8 @@ function renderKPIs(data, yoy) {
 function renderFunnelChart(data) {
   const ctx = document.getElementById('funnelChart');
   const granularity = document.getElementById('granularity').value;
-  const nyBep = perPeriod(settings.nj.bepAnnual, granularity);
-  const nyQuota = perPeriod(settings.nj.quotaAnnual, granularity);
+  const nyBep = perPeriod(settings.ny.bepAnnual, granularity);
+  const nyQuota = perPeriod(settings.ny.quotaAnnual, granularity);
   const flat = (v) => data.map(() => v);
 
   charts.funnel = new Chart(ctx, {
@@ -364,8 +375,8 @@ function renderFunnelChart(data) {
         { label: 'Order PO', data: data.map(p => p.orderPOAmount), borderColor: '#f59e0b', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
         { label: 'Shipped + ESD', data: data.map(p => p.shippedPlusESDAmount), borderColor: '#8b5cf6', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
         { label: 'Shipped (realized)', data: data.map(p => p.shippedAmount), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2, yAxisID: 'y1' },
-        { label: 'NJ BEP', data: flat(nyBep), borderColor: '#dc2626', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, yAxisID: 'y1' },
-        { label: 'NJ Quota', data: flat(nyQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
+        { label: 'NY BEP', data: flat(nyBep), borderColor: '#dc2626', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, yAxisID: 'y1' },
+        { label: 'NY Quota', data: flat(nyQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
       ]
     },
     options: {
@@ -389,47 +400,51 @@ function renderFunnelChart(data) {
 }
 
 function renderQuotaProgress(data) {
-  const revenue = sum(data, 'combinedUS');
-  const bep = settings.nj.bepAnnual;
-  const quota = settings.nj.quotaAnnual > 0 ? settings.nj.quotaAnnual : 1;
-  const bepPct = Math.min(100, (bep / quota) * 100);
-  const rawPct = (revenue / quota) * 100;
+  const revenue = sum(data, 'shippedAmount');
+  const b = { name: 'NY', revenue, bep: settings.ny.bepAnnual, quota: settings.ny.quotaAnnual };
+  document.getElementById('quotaProgress').innerHTML = `<div class="qp-row">${renderQuotaBar(b)}</div>`;
+}
+
+// Shared bar renderer - same markup/logic as Total Sales' version.
+function renderQuotaBar(b) {
+  const quota = b.quota > 0 ? b.quota : 1;
+  const bepPct = Math.min(100, (b.bep / quota) * 100);
+  const rawPct = (b.revenue / quota) * 100;
   const fillPct = Math.min(100, Math.max(0, rawPct));
   const overflow = rawPct > 100;
 
-  let fillColor = '#dc2626';
-  let statusText = `<b style="color:#dc2626;">${fmtUSD(bep - revenue)}</b> short of break-even`;
-  if (revenue >= quota) {
-    fillColor = '#059669';
-    statusText = `<b style="color:#059669;">Quota reached</b> — ${fmtUSD(revenue - quota)} over target`;
-  } else if (revenue >= bep) {
-    fillColor = '#f59e0b';
-    statusText = `Past break-even — <b>${fmtUSD(quota - revenue)}</b> to Quota`;
+  let gapLabelHtml = '';
+  if (b.revenue < b.bep) {
+    const midPct = (fillPct + bepPct) / 2;
+    gapLabelHtml = `<div class="qp-gap-label" style="left:${midPct}%;">${fmtUSD(b.bep - b.revenue)} to BEP</div>`;
+  } else if (b.revenue < quota) {
+    const midPct = (fillPct + 100) / 2;
+    gapLabelHtml = `<div class="qp-gap-label" style="left:${midPct}%;">${fmtUSD(quota - b.revenue)} to Quota</div>`;
   }
 
-  document.getElementById('quotaProgress').innerHTML = `
-    <div class="qp-row">
-      <div class="qp-office">
-        <div class="qp-header">
-          <div class="qp-office-name">NJ</div>
-          <div class="qp-stat">${fmtUSD(revenue)} / ${fmtUSD(quota)} Quota (<b>${rawPct.toFixed(0)}%</b>)${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
-        </div>
-        <div class="qp-track" style="--bep-pct:${bepPct}%;">
-          <div class="qp-marker" style="left:${bepPct}%;"></div>
-          <div class="qp-marker-label" style="left:${bepPct}%;">BEP ${fmtUSD(bep)}</div>
-          <div class="qp-fill" style="width:${fillPct}%; background:${fillColor};">
-            <span class="qp-fill-label">${fillPct > 12 ? fmtUSD(revenue) : ''}</span>
-          </div>
-        </div>
-        <div class="qp-stat" style="margin-top:6px;">${statusText}</div>
+  return `
+    <div class="qp-office">
+      <div class="qp-header">
+        <div class="qp-office-name">${b.name}</div>
+        <div class="qp-stat">Shipped ${fmtUSD(b.revenue)} of ${fmtUSD(quota)} Quota (<b>${rawPct.toFixed(0)}%</b>)${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
       </div>
-    </div>
-    <div class="qp-legend">
-      <span><i style="background:#fee2e2;"></i>Pre-break-even zone</span>
-      <span><i style="background:#dcfce7;"></i>Break-even → Quota zone</span>
-      <span><i style="background:#1a1d1f;width:2px;height:14px;border-radius:0;"></i>BEP marker</span>
+      <div class="qp-track">
+        <div class="qp-fill" style="width:${fillPct}%;">
+          <span class="qp-fill-label">${fillPct > 12 ? fmtUSD(b.revenue) : ''}</span>
+        </div>
+        ${gapLabelHtml}
+        <div class="qp-flag bep" style="left:${bepPct}%;">
+          <div class="qp-flag-label">BEP ${fmtUSD(b.bep)}</div>
+          <div class="qp-flag-tri"></div>
+        </div>
+        <div class="qp-flag quota" style="left:100%;">
+          <div class="qp-flag-label">Quota ${fmtUSD(quota)}</div>
+          <div class="qp-flag-tri"></div>
+        </div>
+      </div>
     </div>`;
 }
+
 
 function renderConversionChart(data) {
   const ctx = document.getElementById('conversionChart');
