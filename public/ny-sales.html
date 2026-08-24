@@ -76,6 +76,42 @@
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
   .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
+  .qp-row { display: flex; flex-direction: column; gap: 22px; }
+  .qp-office { }
+  .qp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .qp-office-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .qp-stat { font-size: 13px; color: var(--muted); }
+  .qp-stat b { color: var(--ink); font-weight: 600; }
+  .qp-track {
+    position: relative; height: 34px; border-radius: 8px; overflow: hidden;
+    background: linear-gradient(to right, #fee2e2 var(--bep-pct), #dcfce7 var(--bep-pct));
+    border: 1px solid var(--line);
+  }
+  .qp-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--fill-color, #2563eb);
+    transition: width 0.4s ease;
+    display: flex; align-items: center; justify-content: flex-end;
+    min-width: 2px;
+  }
+  .qp-fill-label {
+    font-size: 11px; font-weight: 600; color: #fff; padding-right: 8px;
+    white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .qp-marker {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: #1a1d1f;
+  }
+  .qp-marker-label {
+    position: absolute; top: -20px; font-size: 10px; color: var(--muted);
+    transform: translateX(-50%); white-space: nowrap;
+  }
+  .qp-overflow-badge {
+    display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px;
+    background: #dcfce7; color: #059669; font-size: 11px; font-weight: 600;
+  }
+  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
 <body data-dashboard="NY">
@@ -129,6 +165,14 @@
   <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header">
+    <h2>Quota &amp; BEP progress — NY</h2>
+    <span style="font-size:11px;color:var(--muted);">against ANNUAL targets, for the selected date range</span>
+  </div>
+  <div id="quotaProgress"></div>
 </div>
 
 <div class="chart-card">
@@ -238,6 +282,7 @@ async function loadDashboard() {
 
   renderKPIs(data, yoy);
   renderFunnelChart(data);
+  renderQuotaProgress(data);
   renderConversionChart(data);
   renderYoYChart(yoy);
   renderYTDCompareTable(yoy);
@@ -342,6 +387,50 @@ function renderFunnelChart(data) {
     }
   });
 }
+
+function renderQuotaProgress(data) {
+  const revenue = sum(data, 'combinedUS');
+  const bep = settings.ny.bepAnnual;
+  const quota = settings.ny.quotaAnnual > 0 ? settings.ny.quotaAnnual : 1;
+  const bepPct = Math.min(100, (bep / quota) * 100);
+  const rawPct = (revenue / quota) * 100;
+  const fillPct = Math.min(100, Math.max(0, rawPct));
+  const overflow = rawPct > 100;
+
+  let fillColor = '#dc2626';
+  let statusText = `<b style="color:#dc2626;">${fmtUSD(bep - revenue)}</b> short of break-even`;
+  if (revenue >= quota) {
+    fillColor = '#059669';
+    statusText = `<b style="color:#059669;">Quota reached</b> — ${fmtUSD(revenue - quota)} over target`;
+  } else if (revenue >= bep) {
+    fillColor = '#f59e0b';
+    statusText = `Past break-even — <b>${fmtUSD(quota - revenue)}</b> to Quota`;
+  }
+
+  document.getElementById('quotaProgress').innerHTML = `
+    <div class="qp-row">
+      <div class="qp-office">
+        <div class="qp-header">
+          <div class="qp-office-name">NY</div>
+          <div class="qp-stat">${fmtUSD(revenue)} / ${fmtUSD(quota)} Quota (<b>${rawPct.toFixed(0)}%</b>)${overflow ? '<span class="qp-overflow-badge">✓ over quota</span>' : ''}</div>
+        </div>
+        <div class="qp-track" style="--bep-pct:${bepPct}%;">
+          <div class="qp-marker" style="left:${bepPct}%;"></div>
+          <div class="qp-marker-label" style="left:${bepPct}%;">BEP ${fmtUSD(bep)}</div>
+          <div class="qp-fill" style="width:${fillPct}%; background:${fillColor};">
+            <span class="qp-fill-label">${fillPct > 12 ? fmtUSD(revenue) : ''}</span>
+          </div>
+        </div>
+        <div class="qp-stat" style="margin-top:6px;">${statusText}</div>
+      </div>
+    </div>
+    <div class="qp-legend">
+      <span><i style="background:#fee2e2;"></i>Pre-break-even zone</span>
+      <span><i style="background:#dcfce7;"></i>Break-even → Quota zone</span>
+      <span><i style="background:#1a1d1f;width:2px;height:14px;border-radius:0;"></i>BEP marker</span>
+    </div>`;
+}
+
 
 function renderConversionChart(data) {
   const ctx = document.getElementById('conversionChart');
