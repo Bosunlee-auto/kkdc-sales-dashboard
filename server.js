@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
-const { router: authRouter } = require('./routes/auth');
+const { router: authRouter, requireDashboard } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
 const settingsRoutes = require('./routes/settings');
 
@@ -29,15 +29,30 @@ app.use('/api/dashboard', dashboardRoutes);
 // persisted to the Dashboard_Settings CRM module
 app.use('/api/settings', settingsRoutes);
 
+// /api/sales-performance* is shared by Total Sales, NY Sales, and NJ Sales
+// (2026-08-23: "Total sales, NJ and NY sales should be all in the same
+// format" - same endpoints, same response shape, scoped by ?office=NY|NJ).
+// Previously these routes had NO authorization check at all - fixed here by
+// mapping the requested office to the matching Allowed_Dashboards key.
+function requireSalesDashboard(req, res, next) {
+  const office = req.query.office;
+  const key = office === 'NY' ? 'NY' : office === 'NJ' ? 'NJ' : 'TOTAL_SALES';
+  return requireDashboard(key)(req, res, next);
+}
+function normalizeOffice(office) {
+  return office === 'NY' || office === 'NJ' ? office : null;
+}
+
 // Main dashboard data endpoint
-// GET /api/sales-performance?from=2020-01-01&to=2026-12-31&granularity=month
-app.get('/api/sales-performance', async (req, res) => {
+// GET /api/sales-performance?from=2020-01-01&to=2026-12-31&granularity=month&office=NY
+app.get('/api/sales-performance', requireSalesDashboard, async (req, res) => {
   try {
-    const from = req.query.from || '2020-01-01';
+    const from = req.query.from || `${new Date().getFullYear()}-01-01`;
     const to = req.query.to || new Date().toISOString().slice(0, 10);
     const granularity = req.query.granularity || 'month';
+    const office = normalizeOffice(req.query.office);
 
-    const data = await getSalesPerformance(from, to, granularity);
+    const data = await getSalesPerformance(from, to, granularity, office);
     res.json({ data });
   } catch (err) {
     console.error(err);
@@ -46,12 +61,13 @@ app.get('/api/sales-performance', async (req, res) => {
 });
 
 // YoY comparison endpoint - same window, one year prior
-// GET /api/sales-performance/yoy?from=2026-01-01&to=2026-08-06&granularity=month
-app.get('/api/sales-performance/yoy', async (req, res) => {
+// GET /api/sales-performance/yoy?from=2026-01-01&to=2026-08-06&granularity=month&office=NJ
+app.get('/api/sales-performance/yoy', requireSalesDashboard, async (req, res) => {
   try {
     const from = req.query.from;
     const to = req.query.to;
     const granularity = req.query.granularity || 'month';
+    const office = normalizeOffice(req.query.office);
     if (!from || !to) {
       return res.status(400).json({ error: 'from and to are required, e.g. 2026-01-01 / 2026-08-06' });
     }
@@ -60,8 +76,8 @@ app.get('/api/sales-performance/yoy', async (req, res) => {
     const priorTo = shiftYear(to, -1);
 
     const [current, prior] = await Promise.all([
-      getSalesPerformance(from, to, granularity),
-      getSalesPerformance(priorFrom, priorTo, granularity)
+      getSalesPerformance(from, to, granularity, office),
+      getSalesPerformance(priorFrom, priorTo, granularity, office)
     ]);
 
     res.json({ current, prior, priorFrom, priorTo });
@@ -71,16 +87,17 @@ app.get('/api/sales-performance/yoy', async (req, res) => {
   }
 });
 
-// Breakdown by agency and account for a date range
-// GET /api/sales-performance/breakdown?from=2026-03-01&to=2026-03-31
-app.get('/api/sales-performance/breakdown', async (req, res) => {
+// Breakdown by agency, account, and customer for a date range
+// GET /api/sales-performance/breakdown?from=2026-03-01&to=2026-03-31&office=NY
+app.get('/api/sales-performance/breakdown', requireSalesDashboard, async (req, res) => {
   try {
     const from = req.query.from;
     const to = req.query.to;
+    const office = normalizeOffice(req.query.office);
     if (!from || !to) {
       return res.status(400).json({ error: 'from and to are required' });
     }
-    const data = await getBreakdownByAgencyAndAccount(from, to);
+    const data = await getBreakdownByAgencyAndAccount(from, to, office);
     res.json(data);
   } catch (err) {
     console.error(err);
