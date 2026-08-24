@@ -41,6 +41,16 @@
 </div>
 
 <script>
+// Maps a Dashboard_Access "Allowed_Dashboards" key to the page that serves it.
+// Order here also defines priority when a user has multiple - whichever
+// comes first in this list is where they land after login.
+const DASHBOARD_URLS = {
+  TOTAL_SALES: '/index.html',
+  NY: '/ny-sales.html',
+  NJ: '/nj-sales.html',
+  TOTAL_INVOICE: '/total-invoice.html'
+};
+
 async function doLogin() {
   const loginId = document.getElementById('loginId').value.trim();
   const pin = document.getElementById('pin').value.trim();
@@ -58,8 +68,19 @@ async function doLogin() {
     return;
   }
 
+  const { allowedDashboards } = await res.json();
   const params = new URLSearchParams(window.location.search);
-  const next = params.get('next') || '/index.html';
+  const explicitNext = params.get('next');
+
+  // If redirected here from a specific page (e.g. session expired mid-use),
+  // honor that. Otherwise, land on the first dashboard this user is
+  // actually allowed to see - not a hardcoded default that may 403 for
+  // users without Total Sales access (e.g. NY-only or NJ-only accounts).
+  let next = explicitNext;
+  if (!next || next === '/index.html') {
+    const firstAllowed = (allowedDashboards || []).find((key) => DASHBOARD_URLS[key]);
+    next = firstAllowed ? DASHBOARD_URLS[firstAllowed] : '/index.html';
+  }
   window.location.href = next;
 }
 
