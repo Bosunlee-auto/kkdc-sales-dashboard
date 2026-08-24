@@ -272,6 +272,9 @@ function renderKPIs(data, yoy) {
   const margin = sum(data, 'marginTotal');
   const cost = sum(data, 'costTotal');
   const marginPct = (margin + cost) > 0 ? (margin / (margin + cost) * 100) : null;
+  const projectsCount = sum(data, 'projectsRegistered');
+  const quoteCount = sum(data, 'quoteCount');
+  const poCount = sum(data, 'orderPOCount');
 
   const priorCombined = sum(yoy.prior || [], 'combinedUS');
   const yoyPct = priorCombined > 0 ? ((combined - priorCombined) / priorCombined * 100) : null;
@@ -287,6 +290,9 @@ function renderKPIs(data, yoy) {
     <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
     <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
     <div class="kpi"><div class="label">Lost Pipeline (Orders Cancelled)</div><div class="value" style="color:var(--lost)">${fmtUSD(lost)}</div></div>
+    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()}</div></div>
+    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()}</div></div>
+    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()}</div></div>
   `;
 }
 
