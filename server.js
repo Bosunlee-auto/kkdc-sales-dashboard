@@ -7,13 +7,28 @@ const dashboardRoutes = require('./routes/dashboards');
 const settingsRoutes = require('./routes/settings');
 
 const app = express();
+// Railway sits behind a proxy that terminates HTTPS - without this, Express
+// sees the connection as plain HTTP and silently refuses to set
+// "secure" cookies, which is exactly what broke login inside the CRM Web
+// Tab iframe (2026-08-24: login succeeded, but the very next request came
+// back "not logged in" because the cookie was never actually stored).
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'kkdc-dashboard-dev-secret-change-in-railway-env',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 12 * 60 * 60 * 1000 } // 12h - re-login once a day is fine for internal staff
+    cookie: {
+      maxAge: 12 * 60 * 60 * 1000, // 12h - re-login once a day is fine for internal staff
+      // Required for the dashboard to work inside a Zoho CRM Web Tab
+      // (iframe on a different domain). Browsers treat the dashboard as
+      // third-party content there and drop the cookie unless it's
+      // explicitly marked SameSite=None + Secure. Direct browser-tab usage
+      // (not embedded) works fine either way.
+      sameSite: 'none',
+      secure: true
+    }
   })
 );
 app.use(express.static('public'));
