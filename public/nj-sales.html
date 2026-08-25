@@ -140,6 +140,41 @@
   <div id="conversionTable" class="data-table" style="display:none;"></div>
 </div>
 
+<div class="chart-card">
+  <div class="chart-header"><h2>Latency analysis — quote → order → ship</h2></div>
+  <div class="note" style="margin-bottom:16px;">
+    Same-deal latency, not date-bucket division like Conversion Rate above. <b>Final Quote</b> = the exact quote version the order was placed against (last confirmed revision). <b>First Quote</b> = the first quote ever issued for that project, before any revisions - the full sales cycle length.
+  </div>
+  <div id="latencyStats" class="kpi-row" style="grid-template-columns:repeat(5,1fr); margin-bottom:16px;"></div>
+  <div class="grid2">
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Final Quote → Order (days)</div>
+      <canvas id="latencyLinkedQ2OChart"></canvas>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">First Quote → Order (days)</div>
+      <canvas id="latencyFirstQ2OChart"></canvas>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:16px;">
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Order → Ship (days)</div>
+      <canvas id="latencyO2SChart"></canvas>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → Ship (days) — actual factory lead time</div>
+      <canvas id="latencyVendorChart"></canvas>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:16px;">
+    <div style="grid-column: 2;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → ESD (days) — promised lead time, incl. not-yet-shipped</div>
+      <canvas id="latencyVendorESDChart"></canvas>
+    </div>
+  </div>
+  <div id="latencyDataQuality" style="font-size:11px;color:var(--muted);margin-top:12px;"></div>
+</div>
+
 <div class="grid2">
   <div class="chart-card">
     <div class="chart-header"><h2>By agency — order value</h2><button class="table-toggle" data-target="agency">📊 Table</button></div>
@@ -250,12 +285,16 @@ async function loadDashboard() {
     const breakdownRes = await fetch(`/api/sales-performance/breakdown?from=${from}&to=${to}&office=${OFFICE_KEY}`);
     const breakdown = await breakdownRes.json();
 
+    const latencyRes = await fetch(`/api/sales-performance/latency?from=${from}&to=${to}&office=${OFFICE_KEY}`);
+    const latency = await latencyRes.json();
+
     lastData = { data, yoy, breakdown };
 
     renderKPIs(data, yoy);
     renderFunnelChart(data);
     renderQuotaProgress(data);
     renderConversionChart(data);
+    renderLatencyAnalysis(latency);
     renderYoYChart(yoy);
     renderAgencyChart(breakdown.byAgency || []);
     renderAccountChart(breakdown.byAccount || []);
@@ -412,6 +451,78 @@ function renderConversionChart(data) {
   });
 }
 
+
+function renderLatencyAnalysis(latency) {
+  const linkedQ2O = latency.linkedQuoteToOrder || {};
+  const firstQ2O = latency.firstQuoteToOrder || {};
+  const o2s = latency.orderToShip || {};
+  const vendor = latency.vendorOrderToShip || {};
+  const vendorESD = latency.vendorOrderToESD || {};
+  const dq = latency.dataQuality || {};
+
+  const fmtDays = (v) => v === null || v === undefined ? 'n/a' : v.toFixed(1) + ' days';
+
+  document.getElementById('latencyStats').innerHTML = `
+    <div class="kpi"><div class="label">Final Quote → Order (median)</div><div class="value">${fmtDays(linkedQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(linkedQ2O.avgDays)} · n=${linkedQ2O.count || 0}</div></div>
+    <div class="kpi"><div class="label">First Quote → Order (median)</div><div class="value">${fmtDays(firstQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(firstQ2O.avgDays)} · n=${firstQ2O.count || 0}</div></div>
+    <div class="kpi"><div class="label">Order → Ship (median)</div><div class="value">${fmtDays(o2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(o2s.avgDays)} · n=${o2s.count || 0}</div></div>
+    <div class="kpi"><div class="label">Vendor Order → Ship (median)</div><div class="value">${fmtDays(vendor.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(vendor.avgDays)} · n=${vendor.count || 0}</div></div>
+    <div class="kpi"><div class="label">Vendor Order → ESD (median)</div><div class="value">${fmtDays(vendorESD.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(vendorESD.avgDays)} · n=${vendorESD.count || 0}</div></div>
+  `;
+
+  charts.latencyLinkedQ2O = new Chart(document.getElementById('latencyLinkedQ2OChart'), {
+    type: 'bar',
+    data: {
+      labels: (linkedQ2O.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (linkedQ2O.distribution || []).map(d => d.count), backgroundColor: '#f59e0b' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyFirstQ2O = new Chart(document.getElementById('latencyFirstQ2OChart'), {
+    type: 'bar',
+    data: {
+      labels: (firstQ2O.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (firstQ2O.distribution || []).map(d => d.count), backgroundColor: '#7c3aed' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyO2S = new Chart(document.getElementById('latencyO2SChart'), {
+    type: 'bar',
+    data: {
+      labels: (o2s.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (o2s.distribution || []).map(d => d.count), backgroundColor: '#dc2626' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyVendor = new Chart(document.getElementById('latencyVendorChart'), {
+    type: 'bar',
+    data: {
+      labels: (vendor.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Vendor POs', data: (vendor.distribution || []).map(d => d.count), backgroundColor: '#2563eb' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyVendorESD = new Chart(document.getElementById('latencyVendorESDChart'), {
+    type: 'bar',
+    data: {
+      labels: (vendorESD.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Vendor POs', data: (vendorESD.distribution || []).map(d => d.count), backgroundColor: '#93c5fd' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  document.getElementById('latencyDataQuality').innerHTML =
+    `${dq.totalConfirmedOrders || 0} confirmed orders in range · ${dq.noQuoteLinkedCount || 0} have no linked quote (excluded) · ` +
+    `${dq.linkedQuoteToOrderAnomalies || 0} final-quote-after-PO anomalies · ${dq.firstQuoteToOrderAnomalies || 0} first-quote-after-PO anomalies · ` +
+    `${dq.orderToShipAnomalies || 0} ship-before-PO anomalies excluded<br>` +
+    `${dq.totalVendorPOs || 0} vendor POs in range · ${dq.notYetShippedVendorPOs || 0} not yet shipped (excluded from actual-ship chart, still counted in ESD chart) · ` +
+    `${dq.vendorToShipAnomalies || 0} shipped-before-vendor-PO anomalies · ${dq.noETDCount || 0} vendor POs with no ETD set · ${dq.vendorToESDAnomalies || 0} ETD-before-PO anomalies excluded`;
+}
+
 function renderYoYChart(yoy) {
   charts.yoy = new Chart(document.getElementById('yoyChart'), {
     type: 'bar',
@@ -508,4 +619,3 @@ window.__authGuardReady.then(async () => {
 </script>
 </body>
 </html>
-
