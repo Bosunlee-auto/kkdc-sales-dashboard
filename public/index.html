@@ -215,6 +215,12 @@
 
 <div class="chart-card">
   <div class="chart-header"><h2>Conversion rate — quote to order, order to shipped</h2><button class="table-toggle" data-target="conversion">📊 Table</button></div>
+  <div class="note" style="margin-bottom:12px; line-height:1.7;">
+    <b>How to read this chart:</b><br>
+    • Order→Shipped should stay <b>well above</b> Quote→Order year-round - fulfillment is a near-100% commitment on already-won orders, while win rate is naturally much lower.<br>
+    • If the two lines <b>converge or cross</b>, treat it as a warning sign - either fulfillment is lagging, or win rate looks unusually high and is worth checking.<br>
+    • Monthly spikes/dips are normal timing noise - judge this pattern over a <b>full year</b>, not month to month.
+  </div>
   <canvas id="conversionChart"></canvas>
   <div id="conversionTable" class="data-table" style="display:none;"></div>
 </div>
