@@ -219,6 +219,25 @@
   <div id="conversionTable" class="data-table" style="display:none;"></div>
 </div>
 
+<div class="chart-card">
+  <div class="chart-header"><h2>Latency analysis — quote → order → ship</h2></div>
+  <div class="note" style="margin-bottom:16px;">
+    Same-deal latency (via each order's actual linked quote), not date-bucket division like Conversion Rate above - this measures how long the same quote-to-order-to-ship lineage actually took, so it isn't distorted by unrelated quotes/orders landing in different months.
+  </div>
+  <div id="latencyStats" class="kpi-row" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;"></div>
+  <div class="grid2">
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Quote → Order (days)</div>
+      <canvas id="latencyQ2OChart"></canvas>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Order → Ship (days)</div>
+      <canvas id="latencyO2SChart"></canvas>
+    </div>
+  </div>
+  <div id="latencyDataQuality" style="font-size:11px;color:var(--muted);margin-top:12px;"></div>
+</div>
+
 <div class="grid2">
   <div class="chart-card">
     <div class="chart-header"><h2>By agency — order value (selected range)</h2><button class="table-toggle" data-target="agency">📊 Table</button></div>
@@ -320,6 +339,9 @@ async function loadDashboard() {
     const breakdownRes = await fetch(`/api/sales-performance/breakdown?from=${from}&to=${to}`);
     const breakdown = await breakdownRes.json();
 
+    const latencyRes = await fetch(`/api/sales-performance/latency?from=${from}&to=${to}`);
+    const latency = await latencyRes.json();
+
     lastData = { data, yoy, breakdown };
 
     renderKPIs(data, yoy);
@@ -331,6 +353,7 @@ async function loadDashboard() {
     renderAgencyChart(breakdown.byAgency || []);
     renderAccountChart(breakdown.byAccount || []);
     renderCustomerChart(breakdown.byCustomer || []);
+    renderLatencyAnalysis(latency);
   } finally {
     hideSpinner();
   }
@@ -544,6 +567,43 @@ function renderConversionChart(data) {
     },
     options: { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } }
   });
+}
+
+function renderLatencyAnalysis(latency) {
+  const q2o = latency.quoteToOrder || {};
+  const o2s = latency.orderToShip || {};
+  const q2s = latency.quoteToShip || {};
+  const dq = latency.dataQuality || {};
+
+  const fmtDays = (v) => v === null || v === undefined ? 'n/a' : v.toFixed(1) + ' days';
+
+  document.getElementById('latencyStats').innerHTML = `
+    <div class="kpi"><div class="label">Quote → Order (median)</div><div class="value">${fmtDays(q2o.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(q2o.avgDays)} · n=${q2o.count || 0}</div></div>
+    <div class="kpi"><div class="label">Order → Ship (median)</div><div class="value">${fmtDays(o2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(o2s.avgDays)} · n=${o2s.count || 0}</div></div>
+    <div class="kpi"><div class="label">Quote → Ship total (median)</div><div class="value">${fmtDays(q2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(q2s.avgDays)} · n=${q2s.count || 0}</div></div>
+  `;
+
+  charts.latencyQ2O = new Chart(document.getElementById('latencyQ2OChart'), {
+    type: 'bar',
+    data: {
+      labels: (q2o.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (q2o.distribution || []).map(d => d.count), backgroundColor: '#f59e0b' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyO2S = new Chart(document.getElementById('latencyO2SChart'), {
+    type: 'bar',
+    data: {
+      labels: (o2s.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (o2s.distribution || []).map(d => d.count), backgroundColor: '#dc2626' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  document.getElementById('latencyDataQuality').innerHTML =
+    `${dq.totalConfirmedOrders || 0} confirmed orders in range · ${dq.noQuoteLinkedCount || 0} have no linked quote (excluded) · ` +
+    `${dq.quoteToOrderAnomalies || 0} quote-dated-after-PO anomalies excluded · ${dq.orderToShipAnomalies || 0} ship-before-PO anomalies excluded`;
 }
 
 function renderYoYChart(yoy) {
