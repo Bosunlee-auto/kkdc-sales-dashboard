@@ -222,17 +222,27 @@
 <div class="chart-card">
   <div class="chart-header"><h2>Latency analysis — quote → order → ship</h2></div>
   <div class="note" style="margin-bottom:16px;">
-    Same-deal latency (via each order's actual linked quote), not date-bucket division like Conversion Rate above - this measures how long the same quote-to-order-to-ship lineage actually took, so it isn't distorted by unrelated quotes/orders landing in different months.
+    Same-deal latency (via each order's actual linked quote, and via the vendor PO's Purchase_Orders link), not date-bucket division like Conversion Rate above - measures how long each real deal's lineage actually took.
   </div>
-  <div id="latencyStats" class="kpi-row" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;"></div>
+  <div id="latencyStats" class="kpi-row" style="grid-template-columns:repeat(4,1fr); margin-bottom:16px;"></div>
   <div class="grid2">
     <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Quote → Order (days)</div>
-      <canvas id="latencyQ2OChart"></canvas>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Linked Quote → Order (days)</div>
+      <canvas id="latencyLinkedQ2OChart"></canvas>
     </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">First Quote → Order (days)</div>
+      <canvas id="latencyFirstQ2OChart"></canvas>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:16px;">
     <div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Order → Ship (days)</div>
       <canvas id="latencyO2SChart"></canvas>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → Ship (days) — factory lead time</div>
+      <canvas id="latencyVendorChart"></canvas>
     </div>
   </div>
   <div id="latencyDataQuality" style="font-size:11px;color:var(--muted);margin-top:12px;"></div>
@@ -570,24 +580,35 @@ function renderConversionChart(data) {
 }
 
 function renderLatencyAnalysis(latency) {
-  const q2o = latency.quoteToOrder || {};
+  const linkedQ2O = latency.linkedQuoteToOrder || {};
+  const firstQ2O = latency.firstQuoteToOrder || {};
   const o2s = latency.orderToShip || {};
-  const q2s = latency.quoteToShip || {};
+  const vendor = latency.vendorOrderToShip || {};
   const dq = latency.dataQuality || {};
 
   const fmtDays = (v) => v === null || v === undefined ? 'n/a' : v.toFixed(1) + ' days';
 
   document.getElementById('latencyStats').innerHTML = `
-    <div class="kpi"><div class="label">Quote → Order (median)</div><div class="value">${fmtDays(q2o.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(q2o.avgDays)} · n=${q2o.count || 0}</div></div>
+    <div class="kpi"><div class="label">Linked Quote → Order (median)</div><div class="value">${fmtDays(linkedQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(linkedQ2O.avgDays)} · n=${linkedQ2O.count || 0}</div></div>
+    <div class="kpi"><div class="label">First Quote → Order (median)</div><div class="value">${fmtDays(firstQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(firstQ2O.avgDays)} · n=${firstQ2O.count || 0}</div></div>
     <div class="kpi"><div class="label">Order → Ship (median)</div><div class="value">${fmtDays(o2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(o2s.avgDays)} · n=${o2s.count || 0}</div></div>
-    <div class="kpi"><div class="label">Quote → Ship total (median)</div><div class="value">${fmtDays(q2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(q2s.avgDays)} · n=${q2s.count || 0}</div></div>
+    <div class="kpi"><div class="label">Vendor Order → Ship (median)</div><div class="value">${fmtDays(vendor.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(vendor.avgDays)} · n=${vendor.count || 0}</div></div>
   `;
 
-  charts.latencyQ2O = new Chart(document.getElementById('latencyQ2OChart'), {
+  charts.latencyLinkedQ2O = new Chart(document.getElementById('latencyLinkedQ2OChart'), {
     type: 'bar',
     data: {
-      labels: (q2o.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Orders', data: (q2o.distribution || []).map(d => d.count), backgroundColor: '#f59e0b' }]
+      labels: (linkedQ2O.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (linkedQ2O.distribution || []).map(d => d.count), backgroundColor: '#f59e0b' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  charts.latencyFirstQ2O = new Chart(document.getElementById('latencyFirstQ2OChart'), {
+    type: 'bar',
+    data: {
+      labels: (firstQ2O.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Orders', data: (firstQ2O.distribution || []).map(d => d.count), backgroundColor: '#7c3aed' }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
@@ -601,9 +622,20 @@ function renderLatencyAnalysis(latency) {
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
+  charts.latencyVendor = new Chart(document.getElementById('latencyVendorChart'), {
+    type: 'bar',
+    data: {
+      labels: (vendor.distribution || []).map(d => d.label),
+      datasets: [{ label: 'Vendor POs', data: (vendor.distribution || []).map(d => d.count), backgroundColor: '#2563eb' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
   document.getElementById('latencyDataQuality').innerHTML =
     `${dq.totalConfirmedOrders || 0} confirmed orders in range · ${dq.noQuoteLinkedCount || 0} have no linked quote (excluded) · ` +
-    `${dq.quoteToOrderAnomalies || 0} quote-dated-after-PO anomalies excluded · ${dq.orderToShipAnomalies || 0} ship-before-PO anomalies excluded`;
+    `${dq.linkedQuoteToOrderAnomalies || 0} linked-quote-after-PO anomalies · ${dq.firstQuoteToOrderAnomalies || 0} first-quote-after-PO anomalies · ` +
+    `${dq.orderToShipAnomalies || 0} ship-before-PO anomalies excluded<br>` +
+    `${dq.totalVendorPOs || 0} vendor POs in range · ${dq.notYetShippedVendorPOs || 0} not yet shipped (excluded) · ${dq.vendorToShipAnomalies || 0} shipped-before-vendor-PO anomalies excluded`;
 }
 
 function renderYoYChart(yoy) {
