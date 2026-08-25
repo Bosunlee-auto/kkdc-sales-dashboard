@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
+const { getLatencyAnalysis } = require('./lib/latencyAnalysis');
 const { router: authRouter, requireDashboard } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
 const settingsRoutes = require('./routes/settings');
@@ -101,6 +102,27 @@ app.get('/api/sales-performance/breakdown', requireSalesDashboard, async (req, r
       return res.status(400).json({ error: 'from and to are required' });
     }
     const data = await getBreakdownByAgencyAndAccount(from, to, office);
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Latency Analysis - real elapsed days from Quote to Order to Ship, per
+// linked deal (via Sales_Orders.Quote_Name), NOT date-bucket division like
+// the Conversion Rate chart. Per Bosun (2026-08-24): "얼마후 오더가 오고
+// 얼마후 선적이 이루어지는가... 키는 최종 견적이 오더에 이르기까지의 기간."
+// GET /api/sales-performance/latency?from=2026-01-01&to=2026-08-24&office=NY
+app.get('/api/sales-performance/latency', requireSalesDashboard, async (req, res) => {
+  try {
+    const from = req.query.from;
+    const to = req.query.to;
+    const office = normalizeOffice(req.query.office);
+    if (!from || !to) {
+      return res.status(400).json({ error: 'from and to are required' });
+    }
+    const data = await getLatencyAnalysis(from, to, office);
     res.json(data);
   } catch (err) {
     console.error(err);
