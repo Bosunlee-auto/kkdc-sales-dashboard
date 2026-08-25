@@ -76,6 +76,15 @@
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
   .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
+  .qp-card {
+    border-radius: 0 !important;
+    border: 2px solid var(--ink) !important;
+    background: #fafbfc;
+  }
+  .fy-badge {
+    font-size: 11px; font-weight: 700; color: #fff; background: var(--ink);
+    padding: 3px 10px; letter-spacing: 0.04em;
+  }
   .qp-row { display: flex; flex-direction: column; gap: 30px; }
   .qp-office { }
   .qp-office-name { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
@@ -155,10 +164,10 @@
   Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.
 </div>
 
-<div class="chart-card">
+<div class="chart-card qp-card">
   <div class="chart-header">
     <h2>Quota &amp; BEP progress — NY / NJ</h2>
-    <span style="font-size:11px;color:var(--muted);">against ANNUAL targets, for the selected date range</span>
+    <span class="fy-badge" id="fyBadge"></span>
   </div>
   <div id="quotaProgress"></div>
 </div>
@@ -364,11 +373,22 @@ async function loadDashboard() {
     const latencyRes = await fetch(`/api/sales-performance/latency?from=${from}&to=${to}`);
     const latency = await latencyRes.json();
 
+    // Quota & BEP progress is ALWAYS this calendar year to date, regardless
+    // of whatever From/To the user has selected elsewhere on the page - BEP
+    // and Quota are annual targets that can differ year to year, so mixing
+    // them with an arbitrary date range wouldn't mean anything.
+    const fyYear = new Date().getFullYear();
+    const fyFrom = `${fyYear}-01-01`;
+    const fyTo = new Date().toISOString().slice(0, 10);
+    document.getElementById('fyBadge').textContent = `FY${fyYear}`;
+    const quotaRes = await fetch(`/api/sales-performance?from=${fyFrom}&to=${fyTo}&granularity=year`);
+    const { data: quotaData } = await quotaRes.json();
+
     lastData = { data, yoy, breakdown };
 
     renderKPIs(data, yoy);
     renderFunnelChart(data);
-    renderQuotaProgress(data);
+    renderQuotaProgress(quotaData);
     renderConversionChart(data);
     renderYoYChart(yoy);
     renderYTDCompareTable(yoy);
