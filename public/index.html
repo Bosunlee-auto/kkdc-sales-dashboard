@@ -167,9 +167,40 @@
 <div class="chart-card qp-card">
   <div class="chart-header">
     <h2>Quota &amp; BEP progress — NY / NJ</h2>
-    <span class="fy-badge" id="fyBadge"></span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <select id="qpYearSelect" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;"></select>
+      <button id="settingsToggle" style="padding:4px 10px;border-radius:4px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:12px;">⚙ Edit</button>
+      <span class="fy-badge" id="fyBadge"></span>
+    </div>
   </div>
+
+  <div id="settingsPanel" style="display:none; padding:12px 0; border-bottom:1px solid var(--line); margin-bottom:16px;">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Editing <b id="settingsYearLabel"></b> - saving only changes this year, other years are untouched.</div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
+        <input type="number" id="setNjBep" step="1000">
+      </label>
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
+        <input type="number" id="setNjQuota" step="1000">
+      </label>
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
+        <input type="number" id="setNyBep" step="1000">
+      </label>
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
+        <input type="number" id="setNyQuota" step="1000">
+      </label>
+    </div>
+    <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
+    <span id="settingsSaved" style="margin-left:10px;font-size:12px;color:var(--nj);display:none;">Saved ✓</span>
+  </div>
+
   <div id="quotaProgress"></div>
+
+  <div style="border-top:1px solid var(--line); margin-top:24px; padding-top:16px;">
+    <div style="font-size:13px; font-weight:700; color:var(--ink); margin-bottom:4px;">Cumulative Track Record (2023–present)</div>
+    <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">Total actual Shipped vs. total BEP vs. total Quota, summed across every year on file.</div>
+    <div id="cumulativeTrackRecord"></div>
+  </div>
 </div>
 
 <div class="controls">
@@ -189,29 +220,6 @@
   <label>&nbsp;
     <button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button>
   </label>
-  <label>&nbsp;
-    <button id="settingsToggle" style="padding:6px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;">⚙ BEP / Quota</button>
-  </label>
-</div>
-
-<div class="chart-card" id="settingsPanel" style="display:none;">
-  <h2>Break Even Point &amp; Sales Quota — annual figures, auto-converted to the selected granularity</h2>
-  <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:12px;">
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
-      <input type="number" id="setNjBep" step="1000">
-    </label>
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
-      <input type="number" id="setNjQuota" step="1000">
-    </label>
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
-      <input type="number" id="setNyBep" step="1000">
-    </label>
-    <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
-      <input type="number" id="setNyQuota" step="1000">
-    </label>
-  </div>
-  <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
-  <span id="settingsSaved" style="margin-left:10px;font-size:12px;color:var(--nj);display:none;">Saved ✓</span>
 </div>
 
 <div class="kpi-row" id="kpiRow"></div>
@@ -307,7 +315,11 @@ document.getElementById('from').value = `${new Date().getFullYear()}-01-01`; // 
 const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 let charts = {};
 let lastData = { data: [], yoy: {}, breakdown: {} };
-let settings = { nj: { bepAnnual: 0, quotaAnnual: 0 }, ny: { bepAnnual: 0, quotaAnnual: 0 } };
+let settings = { nj: { bepAnnual: 0, quotaAnnual: 0 }, ny: { bepAnnual: 0, quotaAnnual: 0 } }; // ALWAYS current year - used by the main Funnel chart's BEP/Quota reference lines
+let qpSettings = { nj: { bepAnnual: 0, quotaAnnual: 0 }, ny: { bepAnnual: 0, quotaAnnual: 0 } }; // whichever year is selected in the Quota Progress widget's dropdown
+let allSettingsByYear = {};
+let earliestYear = 2023;
+let selectedQpYear = new Date().getFullYear();
 
 // Converts an annual figure to the currently selected granularity.
 // month -> /12, quarter -> /4, year -> as-is.
@@ -317,34 +329,71 @@ function perPeriod(annual, granularity) {
   return annual;
 }
 
-async function loadSettings() {
-  const res = await fetch('/api/settings');
-  settings = await res.json();
-  document.getElementById('setNjBep').value = settings.nj.bepAnnual;
-  document.getElementById('setNjQuota').value = settings.nj.quotaAnnual;
-  document.getElementById('setNyBep').value = settings.ny.bepAnnual;
-  document.getElementById('setNyQuota').value = settings.ny.quotaAnnual;
+async function loadAllSettings() {
+  const res = await fetch('/api/settings/all');
+  const body = await res.json();
+  earliestYear = body.earliestYear || 2023;
+  allSettingsByYear = body.years || {};
+}
+
+function populateYearDropdown() {
+  const select = document.getElementById('qpYearSelect');
+  const thisYear = new Date().getFullYear();
+  select.innerHTML = '';
+  for (let y = thisYear; y >= earliestYear; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y === thisYear ? `${y} (in progress)` : y;
+    select.appendChild(opt);
+  }
+  select.value = selectedQpYear;
+}
+
+function settingsForYear(year) {
+  const y = allSettingsByYear[year];
+  return y || { nj: { bepAnnual: 0, quotaAnnual: 0 }, ny: { bepAnnual: 0, quotaAnnual: 0 } };
+}
+
+function fillSettingsForm(year) {
+  const s = settingsForYear(year);
+  document.getElementById('settingsYearLabel').textContent = year;
+  document.getElementById('setNjBep').value = s.nj.bepAnnual;
+  document.getElementById('setNjQuota').value = s.nj.quotaAnnual;
+  document.getElementById('setNyBep').value = s.ny.bepAnnual;
+  document.getElementById('setNyQuota').value = s.ny.quotaAnnual;
 }
 
 async function saveSettings() {
   const body = {
+    year: selectedQpYear,
     nj: { bepAnnual: Number(document.getElementById('setNjBep').value) || 0, quotaAnnual: Number(document.getElementById('setNjQuota').value) || 0 },
     ny: { bepAnnual: Number(document.getElementById('setNyBep').value) || 0, quotaAnnual: Number(document.getElementById('setNyQuota').value) || 0 }
   };
-  const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  settings = await res.json();
+  await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  await loadAllSettings();
+  if (selectedQpYear === new Date().getFullYear()) {
+    settings = settingsForYear(selectedQpYear);
+    destroyCharts();
+    loadDashboard();
+  }
   const savedLabel = document.getElementById('settingsSaved');
   savedLabel.style.display = 'inline';
   setTimeout(() => { savedLabel.style.display = 'none'; }, 2000);
-  destroyCharts();
-  loadDashboard(); // re-render charts with the new reference lines
+  await loadQuotaSection(selectedQpYear);
+  await loadCumulativeTrackRecord();
 }
 
 document.getElementById('settingsToggle').addEventListener('click', () => {
   const panel = document.getElementById('settingsPanel');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  fillSettingsForm(selectedQpYear);
 });
 document.getElementById('saveSettings').addEventListener('click', saveSettings);
+document.getElementById('qpYearSelect').addEventListener('change', async (e) => {
+  selectedQpYear = Number(e.target.value);
+  fillSettingsForm(selectedQpYear);
+  await loadQuotaSection(selectedQpYear);
+});
 
 function destroyCharts() {
   Object.values(charts).forEach(c => c && c.destroy());
@@ -353,6 +402,70 @@ function destroyCharts() {
 
 function showSpinner() { document.getElementById('spinnerOverlay').classList.add('active'); }
 function hideSpinner() { document.getElementById('spinnerOverlay').classList.remove('active'); }
+
+// Loads and renders the Quota & BEP Progress bar for one specific year -
+// completely independent of the page's From/To filter. Current year uses
+// Jan 1 -> today (in-progress); past years use the full Jan 1 -> Dec 31.
+async function loadQuotaSection(year) {
+  const thisYear = new Date().getFullYear();
+  const qFrom = `${year}-01-01`;
+  const qTo = year === thisYear ? new Date().toISOString().slice(0, 10) : `${year}-12-31`;
+  document.getElementById('fyBadge').textContent = year === thisYear ? `FY${year} (in progress)` : `FY${year} (final)`;
+
+  const settingsForThisYear = settingsForYear(year);
+  qpSettings = settingsForThisYear; // used by renderQuotaBar via the qpSettings variable, NOT the shared `settings`
+
+  const quotaRes = await fetch(`/api/sales-performance?from=${qFrom}&to=${qTo}&granularity=year`);
+  const { data: quotaData } = await quotaRes.json();
+  renderQuotaProgress(quotaData);
+}
+
+// Sums actual Shipped (NY/NJ) from earliestYear-01-01 through today, and
+// sums BEP/Quota across every year on file, to show a permanent cumulative
+// track record - not affected by the page's date filter or the year
+// selector above.
+async function loadCumulativeTrackRecord() {
+  const cumFrom = `${earliestYear}-01-01`;
+  const cumTo = new Date().toISOString().slice(0, 10);
+  const res = await fetch(`/api/sales-performance?from=${cumFrom}&to=${cumTo}&granularity=year`);
+  const { data } = await res.json();
+
+  const actualNY = sum(data, 'shippedAmountNY');
+  const actualNJ = sum(data, 'shippedAmountNJ');
+
+  let totalBepNY = 0, totalQuotaNY = 0, totalBepNJ = 0, totalQuotaNJ = 0;
+  Object.values(allSettingsByYear).forEach((s) => {
+    totalBepNY += s.ny.bepAnnual;
+    totalQuotaNY += s.ny.quotaAnnual;
+    totalBepNJ += s.nj.bepAnnual;
+    totalQuotaNJ += s.nj.quotaAnnual;
+  });
+
+  const row = (label, actual, bep, quota) => {
+    const vsBep = actual - bep;
+    const vsQuota = actual - quota;
+    const fmtDiff = (v) => v >= 0 ? `<span style="color:var(--nj);">+${fmtUSD(v)}</span>` : `<span style="color:var(--lost);">${fmtUSD(v)}</span>`;
+    return `
+      <tr>
+        <td style="font-weight:600;">${label}</td>
+        <td class="amt">${fmtUSD(actual)}</td>
+        <td>${fmtUSD(bep)}</td>
+        <td>${fmtDiff(vsBep)}</td>
+        <td>${fmtUSD(quota)}</td>
+        <td>${fmtDiff(vsQuota)}</td>
+      </tr>`;
+  };
+
+  document.getElementById('cumulativeTrackRecord').innerHTML = `
+    <table class="qp-metrics">
+      <tr><th style="text-align:left;">Office</th><th>Actual Shipped</th><th>Total BEP</th><th>vs BEP</th><th>Total Quota</th><th>vs Quota</th></tr>
+      ${row('NY', actualNY, totalBepNY, totalQuotaNY)}
+      ${row('NJ', actualNJ, totalBepNJ, totalQuotaNJ)}
+      ${row('Combined', actualNY + actualNJ, totalBepNY + totalBepNJ, totalQuotaNY + totalQuotaNJ)}
+    </table>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;">Years included: ${Object.keys(allSettingsByYear).sort().join(', ') || 'none configured yet'}</div>
+  `;
+}
 
 async function loadDashboard() {
   showSpinner();
@@ -373,22 +486,10 @@ async function loadDashboard() {
     const latencyRes = await fetch(`/api/sales-performance/latency?from=${from}&to=${to}`);
     const latency = await latencyRes.json();
 
-    // Quota & BEP progress is ALWAYS this calendar year to date, regardless
-    // of whatever From/To the user has selected elsewhere on the page - BEP
-    // and Quota are annual targets that can differ year to year, so mixing
-    // them with an arbitrary date range wouldn't mean anything.
-    const fyYear = new Date().getFullYear();
-    const fyFrom = `${fyYear}-01-01`;
-    const fyTo = new Date().toISOString().slice(0, 10);
-    document.getElementById('fyBadge').textContent = `FY${fyYear}`;
-    const quotaRes = await fetch(`/api/sales-performance?from=${fyFrom}&to=${fyTo}&granularity=year`);
-    const { data: quotaData } = await quotaRes.json();
-
     lastData = { data, yoy, breakdown };
 
     renderKPIs(data, yoy);
     renderFunnelChart(data);
-    renderQuotaProgress(quotaData);
     renderConversionChart(data);
     renderYoYChart(yoy);
     renderYTDCompareTable(yoy);
@@ -519,8 +620,8 @@ function renderQuotaProgress(data) {
   const njQuote = sum(data, 'quoteAmount') * njShare;
 
   const bars = [
-    { name: 'NY', shipped: nyShipped, shippedESD: totalShippedESD * nyShare, quote: nyQuote, bep: settings.ny.bepAnnual, quota: settings.ny.quotaAnnual },
-    { name: 'NJ', shipped: njShipped, shippedESD: totalShippedESD * njShare, quote: njQuote, bep: settings.nj.bepAnnual, quota: settings.nj.quotaAnnual }
+    { name: 'NY', shipped: nyShipped, shippedESD: totalShippedESD * nyShare, quote: nyQuote, bep: qpSettings.ny.bepAnnual, quota: qpSettings.ny.quotaAnnual },
+    { name: 'NJ', shipped: njShipped, shippedESD: totalShippedESD * njShare, quote: njQuote, bep: qpSettings.nj.bepAnnual, quota: qpSettings.nj.quotaAnnual }
   ];
 
   const html = bars.map((b) => renderQuotaBar(b)).join('');
@@ -868,7 +969,11 @@ document.querySelectorAll('.table-toggle').forEach(btn => {
 
 document.getElementById('refresh').addEventListener('click', () => { destroyCharts(); loadDashboard(); });
 window.__authGuardReady.then(async () => {
-  await loadSettings();
+  await loadAllSettings();
+  settings = settingsForYear(new Date().getFullYear()); // Funnel chart's BEP/Quota lines always use the current year
+  populateYearDropdown();
+  await loadQuotaSection(selectedQpYear);
+  await loadCumulativeTrackRecord();
   await loadDashboard();
 }).catch(() => {});
 </script>
