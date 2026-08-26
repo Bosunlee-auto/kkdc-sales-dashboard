@@ -5,6 +5,7 @@
 <title>KKDC Sales Performance</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
+<script src="/drilldown.js"></script>
 <style>
   :root {
     --ink: #1a1d1f;
@@ -570,6 +571,27 @@ function renderFunnelChart(data) {
   const combinedQuota = perPeriod(settings.nj.quotaAnnual + settings.ny.quotaAnnual, granularity);
   const flat = (v) => data.map(() => v);
 
+  const funnelOptions = {
+    responsive: true,
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      y: {
+        position: 'left',
+        title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } },
+        ticks: { callback: v => fmtUSD(v) }
+      },
+      y1: {
+        position: 'right',
+        title: { display: true, text: 'Order PO / Shipped+ESD / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } },
+        grid: { drawOnChartArea: false },
+        ticks: { callback: v => fmtUSD(v) }
+      }
+    }
+  };
+  // Click a Quote/Order PO/Shipped+ESD/Shipped point to see the underlying
+  // Sales_Orders records, same as the native CRM Analytics drill-down (2026-08-26)
+  attachFunnelDrilldownOnClick(funnelOptions, 'TOTAL', () => document.getElementById('granularity').value);
+
   charts.funnel = new Chart(ctx, {
     type: 'line',
     data: {
@@ -583,23 +605,7 @@ function renderFunnelChart(data) {
         { label: 'Combined Quota', data: flat(combinedQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
       ]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        y: {
-          position: 'left',
-          title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } },
-          ticks: { callback: v => fmtUSD(v) }
-        },
-        y1: {
-          position: 'right',
-          title: { display: true, text: 'Order PO / Shipped+ESD / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } },
-          grid: { drawOnChartArea: false },
-          ticks: { callback: v => fmtUSD(v) }
-        }
-      }
-    }
+    options: funnelOptions
   });
 }
 
