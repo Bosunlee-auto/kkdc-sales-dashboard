@@ -13,7 +13,7 @@ const DRILLDOWN_SERIES_BY_LABEL = {
   'Shipped (realized)': 'shipped'
 };
 
-(function injectDrilldownModal() {
+function injectDrilldownModal() {
   const style = document.createElement('style');
   style.textContent = `
     .dd-overlay {
@@ -79,7 +79,17 @@ const DRILLDOWN_SERIES_BY_LABEL = {
   document.getElementById('ddClose').addEventListener('click', closeDrilldown);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDrilldown(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrilldown(); });
-})();
+}
+
+// This script tag loads in <head>, before <body> exists, so the modal DOM
+// can't be created immediately (document.body is null at that point -
+// 2026-08-26 bug: this silently threw and broke drill-down entirely). Wait
+// for DOMContentLoaded instead.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectDrilldownModal);
+} else {
+  injectDrilldownModal();
+}
 
 function closeDrilldown() {
   document.getElementById('ddOverlay').classList.remove('open');
