@@ -13,6 +13,23 @@ const DRILLDOWN_SERIES_BY_LABEL = {
   'Shipped (realized)': 'shipped'
 };
 
+// CRM deep-link constants (confirmed live via ZohoCRM_getModuleByApiName,
+// 2026-08-26). module_name is the actual URL tab-path segment - it does NOT
+// always match api_name (e.g. Sales_Orders -> "SalesOrders" in the URL).
+const CRM_ORG_ID = '657846854';
+const CRM_TAB_PATH_BY_SERIES = {
+  quote: 'Quotes',        // Quotes.module_name
+  orderPO: 'SalesOrders', // Sales_Orders.module_name
+  shippedPlusESD: 'SalesOrders',
+  shipped: 'SalesOrders'
+};
+
+function crmRecordUrl(series, recordId) {
+  const tabPath = CRM_TAB_PATH_BY_SERIES[series];
+  if (!tabPath || !recordId) return null;
+  return `https://crm.zoho.com/crm/org${CRM_ORG_ID}/tab/${tabPath}/${recordId}`;
+}
+
 function injectDrilldownModal() {
   const style = document.createElement('style');
   style.textContent = `
@@ -37,6 +54,12 @@ function injectDrilldownModal() {
       color: #6b7280; padding: 4px 8px;
     }
     .dd-modal-close:hover { color: #1a1d1f; }
+    .dd-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 10px 20px 0; }
+    .dd-export-btn {
+      font-size: 11px; padding: 5px 12px; border-radius: 6px; border: 1px solid #d1d5db;
+      background: #fff; color: #1a1d1f; cursor: pointer; font-weight: 500;
+    }
+    .dd-export-btn:hover { border-color: #1a1d1f; background: #f5f5f5; }
     .dd-modal-body { max-height: 65vh; overflow: auto; padding: 0; }
     .dd-table { width: 100%; font-size: 12px; border-collapse: collapse; }
     .dd-table th, .dd-table td {
@@ -48,7 +71,9 @@ function injectDrilldownModal() {
       position: sticky; top: 0; background: #fff; color: #6b7280; font-weight: 500;
       text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; border-bottom: 1px solid #e5e7eb;
     }
+    .dd-table tbody tr.dd-row-linked { cursor: pointer; }
     .dd-table tbody tr:hover { background: #fafbfc; }
+    .dd-table tbody tr.dd-row-linked:hover { background: #eef4ff; }
     .dd-state { padding: 40px 20px; text-align: center; color: #6b7280; font-size: 13px; }
     .dd-modal-footer {
       padding: 8px 20px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #6b7280; background: #fafafa;
@@ -68,6 +93,9 @@ function injectDrilldownModal() {
         </div>
         <button class="dd-modal-close" id="ddClose" aria-label="Close">&times;</button>
       </div>
+      <div class="dd-modal-actions">
+        <button class="dd-export-btn" id="ddExport">Export CSV</button>
+      </div>
       <div class="dd-modal-body" id="ddBody">
         <div class="dd-state">Loading...</div>
       </div>
@@ -77,6 +105,7 @@ function injectDrilldownModal() {
   document.body.appendChild(overlay);
 
   document.getElementById('ddClose').addEventListener('click', closeDrilldown);
+  document.getElementById('ddExport').addEventListener('click', exportDrilldownCSV);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDrilldown(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrilldown(); });
 }
@@ -106,6 +135,12 @@ const SERIES_TITLES = {
   shipped: 'Shipped (realized)'
 };
 
+// Holds the currently-displayed dataset so Export CSV can read it without
+// re-fetching or re-parsing the rendered table.
+let ddCurrentRecords = [];
+let ddCurrentSeries = null;
+let ddCurrentLabel = '';
+
 /**
  * office: 'NY' | 'NJ' | 'TOTAL'
  * series: 'quote' | 'orderPO' | 'shippedPlusESD' | 'shipped'
@@ -123,6 +158,9 @@ async function openDrilldown(office, series, period, granularity) {
   sub.textContent = `${office === 'TOTAL' ? 'Total' : office} Sales`;
   body.innerHTML = '<div class="dd-state">Loading...</div>';
   footer.textContent = '';
+  ddCurrentRecords = [];
+  ddCurrentSeries = series;
+  ddCurrentLabel = `${SERIES_TITLES[series] || series} ${period}`;
   overlay.classList.add('open');
 
   try {
@@ -133,6 +171,7 @@ async function openDrilldown(office, series, period, granularity) {
       throw new Error(errData.error || `Request failed (${res.status})`);
     }
     const { records } = await res.json();
+    ddCurrentRecords = records;
     renderDrilldownTable(records, series);
     footer.textContent = `Total Records ${records.length}`;
   } catch (err) {
@@ -157,8 +196,10 @@ function renderDrilldownTable(records, series) {
 
   const rowsHtml = records.map((r) => {
     const dateStr = dateOf(r) ? String(dateOf(r)).slice(0, 10) : '';
+    const url = crmRecordUrl(series, r.id);
+    const rowAttrs = url ? ` class="dd-row-linked" data-url="${escapeHtml(url)}" title="Open in Zoho CRM"` : '';
     if (isQuote) {
-      return `<tr>
+      return `<tr${rowAttrs}>
         <td>${escapeHtml(r.subject || r.qref || '')}</td>
         <td>${dateStr}</td>
         <td>${ddFmtUSD(r.amount)}</td>
@@ -166,7 +207,7 @@ function renderDrilldownTable(records, series) {
         <td>${escapeHtml(r.accountName)}</td>
       </tr>`;
     }
-    return `<tr>
+    return `<tr${rowAttrs}>
       <td>${escapeHtml(r.subject)}</td>
       <td>${dateStr}</td>
       <td>${ddFmtUSD(r.nyCredit)}</td>
@@ -183,6 +224,51 @@ function renderDrilldownTable(records, series) {
       <tbody>${rowsHtml}</tbody>
     </table>
   `;
+
+  // Row click -> open the record directly in Zoho CRM, same as clicking a
+  // row in the native CRM Analytics drill-down table (new tab, so the
+  // dashboard itself never navigates away).
+  body.querySelectorAll('tr.dd-row-linked').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const url = tr.getAttribute('data-url');
+      if (url) window.open(url, '_blank', 'noopener');
+    });
+  });
+}
+
+function csvEscape(value) {
+  const str = value === null || value === undefined ? '' : String(value);
+  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
+}
+
+function exportDrilldownCSV() {
+  if (!ddCurrentRecords || ddCurrentRecords.length === 0) return;
+  const isQuote = ddCurrentSeries === 'quote';
+  const dateOf = (r) => isQuote ? r.quotedDate : (r.shipDate || r.poDate);
+
+  const headers = isQuote
+    ? ['Subject', 'Quote Date', 'Amount', 'Project Name', 'Account Name']
+    : ['Subject', 'Ship Date', 'NY Full Credit', 'NJ Full Credit', 'Project Name', 'Customer PO No.', 'Account Name'];
+
+  const rows = ddCurrentRecords.map((r) => {
+    const dateStr = dateOf(r) ? String(dateOf(r)).slice(0, 10) : '';
+    return isQuote
+      ? [r.subject || r.qref || '', dateStr, r.amount, r.projectName, r.accountName]
+      : [r.subject, dateStr, r.nyCredit, r.njCredit, r.projectName, r.customerPO, r.accountName];
+  });
+
+  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeLabel = ddCurrentLabel.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+  a.href = url;
+  a.download = `${safeLabel || 'drilldown'}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function escapeHtml(str) {
