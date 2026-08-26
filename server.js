@@ -3,6 +3,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
 const { getLatencyAnalysis } = require('./lib/latencyAnalysis');
+const { getDrilldown } = require('./lib/drilldown');
 const { router: authRouter, requireDashboard } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
 const settingsRoutes = require('./routes/settings');
@@ -105,6 +106,27 @@ app.get('/api/sales-performance/breakdown', requireSalesDashboard, async (req, r
     res.json(data);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Drill-down for a single funnel-chart point - Subject / Ship Date / NY+NJ
+// Full Credit / Project Name / Customer PO No / Account Name, same shape as
+// the native Zoho CRM Analytics click-through table (2026-08-26 request).
+// Shares requireSalesDashboard so access follows the same Allowed_Dashboards
+// rule as every other /api/sales-performance* route.
+// GET /api/sales-performance/drilldown?series=shipped&period=2026-04&granularity=month&office=NY
+app.get('/api/sales-performance/drilldown', requireSalesDashboard, async (req, res) => {
+  try {
+    const { series, period, granularity } = req.query;
+    if (!series || !period) {
+      return res.status(400).json({ error: 'series and period query params are required' });
+    }
+    const office = req.query.office === 'NY' || req.query.office === 'NJ' ? req.query.office : 'TOTAL';
+    const records = await getDrilldown({ office, series, period, granularity: granularity || 'month' });
+    res.json({ records });
+  } catch (err) {
+    console.error('drilldown error', err);
     res.status(500).json({ error: err.message });
   }
 });
