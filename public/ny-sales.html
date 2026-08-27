@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC Sales Performance — NJ</title>
+<title>KKDC Sales Performance — NY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
 <script src="/drilldown.js"></script>
@@ -13,25 +13,25 @@
   }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 24px; }
-  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  h1 { font-size: 36px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 26px; margin-bottom: 20px; }
   .office-badge {
-    display: inline-block; background: var(--nj); color: #fff; font-weight: 700;
-    font-size: 12px; padding: 3px 10px; border-radius: 6px; letter-spacing: 0.05em; margin-left: 10px;
+    display: inline-block; background: var(--ny); color: #fff; font-weight: 700;
+    font-size: 24px; padding: 3px 10px; border-radius: 6px; letter-spacing: 0.05em; margin-left: 10px;
   }
   .controls { display: flex; gap: 12px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-  .controls label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-  select, input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; background: var(--card); color: var(--ink); }
+  .controls label { font-size: 24px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  select, input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 26px; background: var(--card); color: var(--ink); }
   .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 20px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-  .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .kpi .value { font-size: 15px; font-weight: 600; margin-top: 3px; }
-  .kpi .yoy { font-size: 12px; margin-top: 2px; }
+  .kpi .label { font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .kpi .value { font-size: 30px; font-weight: 600; margin-top: 3px; }
+  .kpi .yoy { font-size: 24px; margin-top: 2px; }
   .yoy.up { color: var(--nj); }
   .yoy.down { color: var(--lost); }
   .chart-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .chart-header h2 { font-size: 13px; font-weight: 600; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .chart-header h2 { font-size: 26px; font-weight: 600; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   canvas { max-height: 320px; }
   /* Agency/Account/Customer breakdown charts scale their own height by row
      count (see renderAgencyChart etc.) - the 320px cap above would otherwise
@@ -46,53 +46,53 @@
     max-height: none;
   }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .note { font-size: 12px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b; border-radius: 6px; padding: 8px 12px; margin-bottom: 20px; }
-  .table-toggle { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; }
+  .note { font-size: 24px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b; border-radius: 6px; padding: 8px 12px; margin-bottom: 20px; }
+  .table-toggle { font-size: 22px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; }
   .table-toggle:hover { border-color: var(--ink); color: var(--ink); }
   .table-toggle.active { background: var(--ink); color: #fff; border-color: var(--ink); }
   .data-table { max-height: 340px; overflow: auto; }
-  .data-table table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .data-table table { width: 100%; font-size: 24px; border-collapse: collapse; }
   .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
-  .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
+  .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 20px; }
   .qp-card {
     border-radius: 0 !important;
     border: 2px solid var(--ink) !important;
     background: #fafbfc;
   }
   .fy-badge {
-    font-size: 11px; font-weight: 700; color: #fff; background: var(--ink);
+    font-size: 22px; font-weight: 700; color: #fff; background: var(--ink);
     padding: 3px 10px; letter-spacing: 0.04em;
   }
   .qp-row { display: flex; flex-direction: column; gap: 30px; }
   .qp-office { }
-  .qp-office-name { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
-  .qp-refs { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .qp-office-name { font-size: 28px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .qp-refs { font-size: 24px; color: var(--muted); margin-bottom: 10px; }
   .qp-refs b { color: var(--ink); font-weight: 600; }
-  .qp-metrics { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
-  .qp-metrics th { text-align: right; font-weight: 500; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 8px 6px; border-bottom: 1px solid var(--line); }
+  .qp-metrics { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 24px; }
+  .qp-metrics th { text-align: right; font-weight: 500; color: var(--muted); font-size: 20px; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 8px 6px; border-bottom: 1px solid var(--line); }
   .qp-metrics th:first-child { text-align: left; }
-  .qp-metrics td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+  .qp-metrics td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 24px; color: var(--ink); }
   .qp-metrics td:first-child { text-align: left; font-weight: 600; color: var(--muted); }
   .qp-metrics tr:last-child td { border-bottom: none; }
   .qp-metrics .amt { font-weight: 700; }
   .qp-metrics .pct { color: var(--ink); font-weight: 600; }
-  .qp-metrics .short { color: var(--lost); font-weight: 400; font-size: 11px; }
-  .qp-metrics .over { color: var(--nj); font-weight: 400; font-size: 11px; }
-  .qp-metrics .rate-label { color: var(--muted); font-weight: 400; font-size: 10px; }
+  .qp-metrics .short { color: var(--lost); font-weight: 400; font-size: 22px; }
+  .qp-metrics .over { color: var(--nj); font-weight: 400; font-size: 22px; }
+  .qp-metrics .rate-label { color: var(--muted); font-weight: 400; font-size: 20px; }
   .qp-track { position: relative; height: 26px; border-radius: 6px; overflow: visible; background: #f1f2f4; border: 1px solid rgba(0,0,0,0.18); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.03); }
   .qp-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px 0 0 6px; background: #f59e0b; transition: width 0.4s ease; min-width: 2px; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; z-index: 2; }
-  .qp-fill-label { font-size: 10px; font-weight: 700; color: #fff; padding-right: 6px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+  .qp-fill-label { font-size: 20px; font-weight: 700; color: #fff; padding-right: 6px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
   .qp-fill-esd { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px 0 0 6px; background: #fde3ad; transition: width 0.4s ease; z-index: 1; }
-  .qp-esd-label { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 600; color: #92671a; white-space: nowrap; z-index: 1; }
+  .qp-esd-label { position: absolute; top: 50%; transform: translateY(-50%); font-size: 20px; font-weight: 600; color: #92671a; white-space: nowrap; z-index: 1; }
   .qp-flag { position: absolute; top: -2px; transform: translateX(-50%); text-align: center; z-index: 2; }
   .qp-flag-tri { width: 0; height: 0; margin: 0 auto; border-left: 5px solid transparent; border-right: 5px solid transparent; }
   .qp-flag.bep .qp-flag-tri { border-top: 7px solid #1a1d1f; }
   .qp-flag.quota .qp-flag-tri { border-top: 7px solid #7c3aed; }
-  .qp-flag-label { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 600; white-space: nowrap; }
+  .qp-flag-label { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 600; white-space: nowrap; }
   .qp-flag.bep .qp-flag-label { color: #1a1d1f; }
   .qp-flag.quota .qp-flag-label { color: #7c3aed; }
-  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .qp-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 22px; color: var(--muted); }
   .qp-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .qp-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   .spinner-overlay {
@@ -107,43 +107,43 @@
   @keyframes kkdc-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<body data-dashboard="NJ">
+<body data-dashboard="NY">
 <div class="spinner-overlay" id="spinnerOverlay"><div class="spinner"></div></div>
 
-<h1>KKDC Sales Performance <span class="office-badge">OFFICE: NJ</span></h1>
-<div class="sub">Project → Quote → Order → Shipped funnel, NJ office only</div>
+<h1>KKDC Sales Performance <span class="office-badge">OFFICE: NY</span></h1>
+<div class="sub">Project → Quote → Order → Shipped funnel, NY office only</div>
 
 <div class="note">Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.</div>
 
 <div class="chart-card qp-card">
   <div class="chart-header">
-    <h2>Quota &amp; BEP progress — NJ (Shipped basis)</h2>
+    <h2>Quota &amp; BEP progress — NY (Shipped basis)</h2>
     <div style="display:flex; align-items:center; gap:10px;">
-      <select id="qpYearSelect" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;"></select>
-      <button id="settingsToggle" style="padding:4px 10px;border-radius:4px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:12px;">⚙ Edit</button>
+      <select id="qpYearSelect" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:24px;"></select>
+      <button id="settingsToggle" style="padding:4px 10px;border-radius:4px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:24px;">⚙ Edit</button>
       <span class="fy-badge" id="fyBadge"></span>
     </div>
   </div>
 
   <div id="settingsPanel" style="display:none; padding:12px 0; border-bottom:1px solid var(--line); margin-bottom:16px;">
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Editing <b id="settingsYearLabel"></b> - saving only changes this year, other years are untouched.</div>
+    <div style="font-size:24px;color:var(--muted);margin-bottom:10px;">Editing <b id="settingsYearLabel"></b> - saving only changes this year, other years are untouched.</div>
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:12px; max-width:500px;">
-      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
+      <label style="font-size:24px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
         <input type="number" id="setBep" step="1000">
       </label>
-      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
+      <label style="font-size:24px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
         <input type="number" id="setQuota" step="1000">
       </label>
     </div>
     <button id="saveSettings" style="padding:8px 16px;border-radius:6px;border:none;background:var(--ink);color:#fff;cursor:pointer;">Save</button>
-    <span id="settingsSaved" style="margin-left:10px;font-size:12px;color:var(--nj);display:none;">Saved ✓</span>
+    <span id="settingsSaved" style="margin-left:10px;font-size:24px;color:var(--nj);display:none;">Saved ✓</span>
   </div>
 
   <div id="quotaProgress"></div>
 
   <div style="border-top:1px solid var(--line); margin-top:24px; padding-top:16px;">
-    <div style="font-size:13px; font-weight:700; color:var(--ink); margin-bottom:4px;">Cumulative Track Record (2023–present)</div>
-    <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">Total actual Shipped vs. total BEP vs. total Quota, summed across every year on file.</div>
+    <div style="font-size:26px; font-weight:700; color:var(--ink); margin-bottom:4px;">Cumulative Track Record (2023–present)</div>
+    <div style="font-size:22px; color:var(--muted); margin-bottom:12px;">Total actual Shipped vs. total BEP vs. total Quota, summed across every year on file.</div>
     <div id="cumulativeTrackRecord"></div>
   </div>
 </div>
@@ -164,7 +164,7 @@
 <div class="kpi-row" id="kpiRow"></div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Funnel over time — NJ</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
@@ -189,31 +189,31 @@
   <div id="latencyStats" class="kpi-row" style="grid-template-columns:repeat(5,1fr); margin-bottom:16px;"></div>
   <div class="grid2">
     <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Final Quote → Order (days)</div>
+      <div style="font-size:24px;color:var(--muted);margin-bottom:8px;font-weight:600;">Final Quote → Order (days)</div>
       <canvas id="latencyLinkedQ2OChart"></canvas>
     </div>
     <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">First Quote → Order (days)</div>
+      <div style="font-size:24px;color:var(--muted);margin-bottom:8px;font-weight:600;">First Quote → Order (days)</div>
       <canvas id="latencyFirstQ2OChart"></canvas>
     </div>
   </div>
   <div class="grid2" style="margin-top:16px;">
     <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Order → Ship (days)</div>
+      <div style="font-size:24px;color:var(--muted);margin-bottom:8px;font-weight:600;">Order → Ship (days)</div>
       <canvas id="latencyO2SChart"></canvas>
     </div>
     <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → Ship (days) — actual factory lead time</div>
+      <div style="font-size:24px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → Ship (days) — actual factory lead time</div>
       <canvas id="latencyVendorChart"></canvas>
     </div>
   </div>
   <div class="grid2" style="margin-top:16px;">
     <div style="grid-column: 2;">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → ESD (days) — promised lead time, incl. not-yet-shipped</div>
+      <div style="font-size:24px;color:var(--muted);margin-bottom:8px;font-weight:600;">Vendor Order → ESD (days) — promised lead time, incl. not-yet-shipped</div>
       <canvas id="latencyVendorESDChart"></canvas>
     </div>
   </div>
-  <div id="latencyDataQuality" style="font-size:11px;color:var(--muted);margin-top:12px;"></div>
+  <div id="latencyDataQuality" style="font-size:22px;color:var(--muted);margin-top:12px;"></div>
 </div>
 
 <div class="chart-card">
@@ -235,20 +235,20 @@
 </div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Year-over-year — NJ order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
+  <div class="chart-header"><h2>Year-over-year — NY order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
   <canvas id="yoyChart"></canvas>
   <div id="yoyTable" class="data-table" style="display:none;"></div>
 </div>
 
 <script>
 // ============================================================
-// THIS OFFICE = 'NJ'. Every API call below hardcodes ?office=NJ.
-// If this page ever shows NY numbers, search this file for the
-// literal string 'NJ' in the OFFICE_KEY constant below - that is
+// THIS OFFICE = 'NY'. Every API call below hardcodes ?office=NY.
+// If this page ever shows NJ numbers, search this file for the
+// literal string 'NY' in the OFFICE_KEY constant below - that is
 // the single source of truth for which office this page queries.
 // ============================================================
-const OFFICE_KEY = 'NJ';
-const SETTINGS_KEY = 'nj'; // key into the /api/settings response object
+const OFFICE_KEY = 'NY';
+const SETTINGS_KEY = 'ny'; // key into the /api/settings response object
 
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
 document.getElementById('from').value = `${new Date().getFullYear()}-01-01`;
@@ -391,7 +391,7 @@ async function loadCumulativeTrackRecord() {
         <td>${fmtDiff(vsQuota)}</td>
       </tr>
     </table>
-    <div style="font-size:10px;color:var(--muted);margin-top:6px;">Years included: ${Object.keys(allSettingsByYear).sort().join(', ') || 'none configured yet'}</div>
+    <div style="font-size:20px;color:var(--muted);margin-top:6px;">Years included: ${Object.keys(allSettingsByYear).sort().join(', ') || 'none configured yet'}</div>
   `;
 }
 
@@ -457,11 +457,11 @@ function renderKPIs(data, yoy) {
     <div class="kpi"><div class="label">Total Quote</div><div class="value">${fmtUSD(quote)}</div></div>
     <div class="kpi"><div class="label">Shipped (realized)</div><div class="value">${fmtUSD(shipped)}</div></div>
     <div class="kpi"><div class="label">Shipped + ESD</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
-    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
+    <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:24px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
     <div class="kpi"><div class="label">Lost Pipeline (Orders Cancelled)</div><div class="value" style="color:var(--lost)">${fmtUSD(lost)}</div></div>
-    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(projectsCount)}/wk)</span></div>${yoyBadge(pctChange(projectsCount, priorProjects))}</div>
-    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(quoteCount)}/wk)</span></div>${yoyBadge(pctChange(quoteCount, priorQuoteCount))}</div>
-    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(poCount)}/wk)</span></div>${yoyBadge(pctChange(poCount, priorPoCount))}</div>
+    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()} <span style="font-size:24px;color:var(--muted);">(${perWeek(projectsCount)}/wk)</span></div>${yoyBadge(pctChange(projectsCount, priorProjects))}</div>
+    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()} <span style="font-size:24px;color:var(--muted);">(${perWeek(quoteCount)}/wk)</span></div>${yoyBadge(pctChange(quoteCount, priorQuoteCount))}</div>
+    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()} <span style="font-size:24px;color:var(--muted);">(${perWeek(poCount)}/wk)</span></div>${yoyBadge(pctChange(poCount, priorPoCount))}</div>
   `;
 }
 
@@ -475,8 +475,8 @@ function renderFunnelChart(data) {
     responsive: true,
     plugins: { legend: { position: 'bottom' } },
     scales: {
-      y: { position: 'left', title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } }, ticks: { callback: v => fmtUSD(v) } },
-      y1: { position: 'right', title: { display: true, text: 'Order PO / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } }, grid: { drawOnChartArea: false }, ticks: { callback: v => fmtUSD(v) } }
+      y: { position: 'left', title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 22 } }, ticks: { callback: v => fmtUSD(v) } },
+      y1: { position: 'right', title: { display: true, text: 'Order PO / Shipped / BEP / Quota', color: '#6b7280', font: { size: 22 } }, grid: { drawOnChartArea: false }, ticks: { callback: v => fmtUSD(v) } }
     }
   };
   // Click a Quote/Order PO/Shipped+ESD/Shipped point to see the underlying
@@ -600,11 +600,11 @@ function renderLatencyAnalysis(latency) {
   });
 
   document.getElementById('latencyStats').innerHTML = `
-    <div class="kpi"><div class="label">Final Quote → Order (median)</div><div class="value">${fmtDays(linkedQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(linkedQ2O.avgDays)} · n=${linkedQ2O.count || 0}</div></div>
-    <div class="kpi"><div class="label">First Quote → Order (median)</div><div class="value">${fmtDays(firstQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(firstQ2O.avgDays)} · n=${firstQ2O.count || 0}</div></div>
-    <div class="kpi"><div class="label">Order → Ship (median)</div><div class="value">${fmtDays(o2s.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(o2s.avgDays)} · n=${o2s.count || 0}</div></div>
-    <div class="kpi"><div class="label">Vendor Order → Ship (median)</div><div class="value">${fmtDays(vendor.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(vendor.avgDays)} · n=${vendor.count || 0}</div></div>
-    <div class="kpi"><div class="label">Vendor Order → ESD (median)</div><div class="value">${fmtDays(vendorESD.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(vendorESD.avgDays)} · n=${vendorESD.count || 0}</div></div>
+    <div class="kpi"><div class="label">Final Quote → Order (median)</div><div class="value">${fmtDays(linkedQ2O.medianDays)}</div><div style="font-size:22px;color:var(--muted);">avg ${fmtDays(linkedQ2O.avgDays)} · n=${linkedQ2O.count || 0}</div></div>
+    <div class="kpi"><div class="label">First Quote → Order (median)</div><div class="value">${fmtDays(firstQ2O.medianDays)}</div><div style="font-size:22px;color:var(--muted);">avg ${fmtDays(firstQ2O.avgDays)} · n=${firstQ2O.count || 0}</div></div>
+    <div class="kpi"><div class="label">Order → Ship (median)</div><div class="value">${fmtDays(o2s.medianDays)}</div><div style="font-size:22px;color:var(--muted);">avg ${fmtDays(o2s.avgDays)} · n=${o2s.count || 0}</div></div>
+    <div class="kpi"><div class="label">Vendor Order → Ship (median)</div><div class="value">${fmtDays(vendor.medianDays)}</div><div style="font-size:22px;color:var(--muted);">avg ${fmtDays(vendor.avgDays)} · n=${vendor.count || 0}</div></div>
+    <div class="kpi"><div class="label">Vendor Order → ESD (median)</div><div class="value">${fmtDays(vendorESD.medianDays)}</div><div style="font-size:22px;color:var(--muted);">avg ${fmtDays(vendorESD.avgDays)} · n=${vendorESD.count || 0}</div></div>
   `;
 
   charts.latencyLinkedQ2O = new Chart(document.getElementById('latencyLinkedQ2OChart'), {
@@ -702,7 +702,7 @@ function renderAgencyChart(rows) {
         legend: { display: false },
         tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
       },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
+      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 22 } } } }
     }
   });
 }
@@ -720,7 +720,7 @@ function renderAccountChart(rows) {
         legend: { display: false },
         tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
       },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
+      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 22 } } } }
     }
   });
 }
@@ -738,7 +738,7 @@ function renderCustomerChart(rows) {
         legend: { display: false },
         tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
       },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
+      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 22 } } } }
     }
   });
 }
