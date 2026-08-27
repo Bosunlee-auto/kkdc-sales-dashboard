@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>KKDC Sales Performance — NY</title>
+<title>KKDC Sales Performance — NJ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
 <script src="/drilldown.js"></script>
@@ -16,7 +16,7 @@
   h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
   .office-badge {
-    display: inline-block; background: var(--ny); color: #fff; font-weight: 700;
+    display: inline-block; background: var(--nj); color: #fff; font-weight: 700;
     font-size: 12px; padding: 3px 10px; border-radius: 6px; letter-spacing: 0.05em; margin-left: 10px;
   }
   .controls { display: flex; gap: 12px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
@@ -107,17 +107,17 @@
   @keyframes kkdc-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<body data-dashboard="NY">
+<body data-dashboard="NJ">
 <div class="spinner-overlay" id="spinnerOverlay"><div class="spinner"></div></div>
 
-<h1>KKDC Sales Performance <span class="office-badge">OFFICE: NY</span></h1>
-<div class="sub">Project → Quote → Order → Shipped funnel, NY office only</div>
+<h1>KKDC Sales Performance <span class="office-badge">OFFICE: NJ</span></h1>
+<div class="sub">Project → Quote → Order → Shipped funnel, NJ office only</div>
 
 <div class="note">Cancelled / On-hold / Ship-standby / Superceded orders are tracked separately as "lost pipeline" and excluded from the funnel totals below.</div>
 
 <div class="chart-card qp-card">
   <div class="chart-header">
-    <h2>Quota &amp; BEP progress — NY (Shipped basis)</h2>
+    <h2>Quota &amp; BEP progress — NJ (Shipped basis)</h2>
     <div style="display:flex; align-items:center; gap:10px;">
       <select id="qpYearSelect" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;"></select>
       <button id="settingsToggle" style="padding:4px 10px;border-radius:4px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:12px;">⚙ Edit</button>
@@ -128,10 +128,10 @@
   <div id="settingsPanel" style="display:none; padding:12px 0; border-bottom:1px solid var(--line); margin-bottom:16px;">
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Editing <b id="settingsYearLabel"></b> - saving only changes this year, other years are untouched.</div>
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:12px; max-width:500px;">
-      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY BEP (annual $)
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ BEP (annual $)
         <input type="number" id="setBep" step="1000">
       </label>
-      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NY Quota (annual $)
+      <label style="font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px;">NJ Quota (annual $)
         <input type="number" id="setQuota" step="1000">
       </label>
     </div>
@@ -164,7 +164,7 @@
 <div class="kpi-row" id="kpiRow"></div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Funnel over time — NY</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <div class="chart-header"><h2>Funnel over time — NJ</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
@@ -235,20 +235,20 @@
 </div>
 
 <div class="chart-card">
-  <div class="chart-header"><h2>Year-over-year — NY order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
+  <div class="chart-header"><h2>Year-over-year — NJ order value</h2><button class="table-toggle" data-target="yoy">📊 Table</button></div>
   <canvas id="yoyChart"></canvas>
   <div id="yoyTable" class="data-table" style="display:none;"></div>
 </div>
 
 <script>
 // ============================================================
-// THIS OFFICE = 'NY'. Every API call below hardcodes ?office=NY.
-// If this page ever shows NJ numbers, search this file for the
-// literal string 'NY' in the OFFICE_KEY constant below - that is
+// THIS OFFICE = 'NJ'. Every API call below hardcodes ?office=NJ.
+// If this page ever shows NY numbers, search this file for the
+// literal string 'NJ' in the OFFICE_KEY constant below - that is
 // the single source of truth for which office this page queries.
 // ============================================================
-const OFFICE_KEY = 'NY';
-const SETTINGS_KEY = 'ny'; // key into the /api/settings response object
+const OFFICE_KEY = 'NJ';
+const SETTINGS_KEY = 'nj'; // key into the /api/settings response object
 
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
 document.getElementById('from').value = `${new Date().getFullYear()}-01-01`;
