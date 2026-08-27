@@ -33,6 +33,11 @@
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .chart-header h2 { font-size: 13px; font-weight: 600; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   canvas { max-height: 320px; }
+  /* Agency/Account/Customer breakdown charts scale their own height by row
+     count (see renderAgencyChart etc.) - the 320px cap above would otherwise
+     squash bars thinner as row count grows, making Agency (25 rows) look
+     wispy next to Account (15 rows) at the same fixed height (2026-08-27). */
+  #agencyChart, #accountChart, #customerChart { max-height: none; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .note { font-size: 12px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b; border-radius: 6px; padding: 8px 12px; margin-bottom: 20px; }
   .table-toggle { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; }
