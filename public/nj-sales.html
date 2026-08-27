@@ -659,33 +659,42 @@ function renderYoYChart(yoy) {
 function renderAgencyChart(rows) {
   const ctx = document.getElementById('agencyChart');
   const top = rows.slice(0, 25);
-  ctx.parentElement.style.height = Math.max(280, top.length * 22) + 'px';
+  ctx.parentElement.style.height = Math.max(280, top.length * 26) + 'px';
   charts.agency = new Chart(ctx, {
     type: 'bar',
     data: { labels: top.map(r => r.name), datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#8b5cf6' }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { autoSkip: false, font: { size: 11 } } } }
+    }
   });
 }
 
 function renderAccountChart(rows) {
   const ctx = document.getElementById('accountChart');
   const top = rows.slice(0, 15);
-  ctx.parentElement.style.height = Math.max(280, top.length * 22) + 'px';
+  ctx.parentElement.style.height = Math.max(280, top.length * 26) + 'px';
   charts.account = new Chart(ctx, {
     type: 'bar',
     data: { labels: top.map(r => r.name), datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#2563eb' }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { autoSkip: false, font: { size: 11 } } } }
+    }
   });
 }
 
 function renderCustomerChart(rows) {
   const ctx = document.getElementById('customerChart');
   const top = rows.slice(0, 15);
-  ctx.parentElement.style.height = Math.max(280, top.length * 22) + 'px';
+  ctx.parentElement.style.height = Math.max(280, top.length * 26) + 'px';
   charts.customer = new Chart(ctx, {
     type: 'bar',
     data: { labels: top.map(r => r.name), datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#f59e0b' }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { autoSkip: false, font: { size: 11 } } } }
+    }
   });
 }
 
