@@ -54,6 +54,11 @@
   }
   .chart-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   canvas { max-height: 320px; }
+  /* Agency/Account/Customer breakdown charts scale their own height by row
+     count (see renderAgencyChart etc.) - the 320px cap above would otherwise
+     squash bars thinner as row count grows, making Agency (25 rows) look
+     wispy next to Account (15 rows) at the same fixed height (2026-08-27). */
+  #agencyChart, #accountChart, #customerChart { max-height: none; }
   #ytdCompareTable th, #ytdCompareTable td { padding: 8px 10px; text-align: right; border-bottom: 0.5px solid var(--line); }
   #ytdCompareTable th:first-child, #ytdCompareTable td:first-child { text-align: left; }
   #ytdCompareTable th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
