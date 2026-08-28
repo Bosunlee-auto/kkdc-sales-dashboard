@@ -105,4 +105,4 @@ function requireDashboard(dashboardKey) {
   };
 }
 
-module.exports = { router, requireDashboard, VALID_DASHBOARDS };
+module.exports = { router, requireDashboard, VALID_DASHBOARDS, verifyRequest };
