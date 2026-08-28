@@ -35,11 +35,19 @@
 
     const required = document.body.getAttribute('data-dashboard');
     if (required && !session.allowedDashboards.includes(required)) {
+      // Route to the FIRST dashboard this user actually has access to, not
+      // a hardcoded /index.html - a user without Total Sales access (e.g.
+      // someone allowed only NY) would otherwise land on another
+      // "Not authorized" page when they click this link, with no way out
+      // except editing the URL by hand (2026-08-28, reported by Nigel).
+      const fallbackKey = session.allowedDashboards.find((key) => DASHBOARD_URLS[key]);
+      const fallbackUrl = fallbackKey ? DASHBOARD_URLS[fallbackKey] : '/login.html';
+      const fallbackLabel = fallbackKey ? `Go to ${DASHBOARD_LABELS[fallbackKey]}` : 'Back to login';
       document.body.innerHTML =
         '<div style="padding:60px;text-align:center;font-family:sans-serif;color:#6b7280;">' +
         '<h2 style="color:#1a1d1f;">Not authorized</h2>' +
         '<p>Your account does not have access to this dashboard. Contact Bosun to update your access in CRM.</p>' +
-        '<a href="/index.html">Go to a dashboard you have access to</a>' +
+        `<a href="${fallbackUrl}">${fallbackLabel}</a>` +
         '</div>';
       throw new Error('unauthorized'); // stop the page's own dashboard script from running
     }
