@@ -77,7 +77,7 @@ async function doLogin() {
   // actually allowed to see - not a hardcoded default that may 403 for
   // users without Total Sales access (e.g. NY-only or NJ-only accounts).
   let next = explicitNext;
-  if (!next || next === '/index.html') {
+  if (!next || next === '/' || next === '/index.html') {
     const firstAllowed = (allowedDashboards || []).find((key) => DASHBOARD_URLS[key]);
     next = firstAllowed ? DASHBOARD_URLS[firstAllowed] : '/index.html';
   }
