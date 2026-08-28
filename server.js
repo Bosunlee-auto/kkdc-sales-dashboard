@@ -4,7 +4,7 @@ const cookieParser = require('cookie-parser');
 const { getSalesPerformance, getQuoteSnapshotByPeriod, getBreakdownByAgencyAndAccount } = require('./lib/salesPerformance');
 const { getLatencyAnalysis } = require('./lib/latencyAnalysis');
 const { getDrilldown } = require('./lib/drilldown');
-const { router: authRouter, requireDashboard } = require('./routes/auth');
+const { router: authRouter, requireDashboard, verifyRequest } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboards');
 const settingsRoutes = require('./routes/settings');
 
@@ -21,7 +21,31 @@ app.use(cookieParser());
 // signed JWT cookie (see routes/auth.js) instead of server memory, so a
 // Railway redeploy no longer logs everyone out - only the cookie's own
 // ~6-month expiry or an explicit logout ends a session.
-app.use(express.static('public'));
+// { index: false } disables express.static's automatic index.html serving
+// at '/' - the route below now owns that path exclusively, so every other
+// static file (e.g. /ny-sales.html) still serves normally either way.
+app.use(express.static('public', { index: false }));
+
+// Same-domain onboarding link (e.g. the "backup URL" in login instruction
+// emails) points at the bare domain root. Without this route, that URL
+// unconditionally served index.html (Total Sales) via express.static's
+// default index-file behavior - so anyone without Total Sales access (e.g.
+// Nigel, allowed only NY) hit "Not authorized" immediately, even though
+// their account and permissions were entirely correct. Root now sends each
+// logged-in user to the first dashboard they're actually allowed to see.
+// (2026-08-28, reported by Nigel via Bosun)
+const ROOT_DASHBOARD_URLS = {
+  NY: '/ny-sales.html',
+  NJ: '/nj-sales.html',
+  TOTAL_SALES: '/index.html',
+  TOTAL_INVOICE: '/total-invoice.html'
+};
+app.get('/', (req, res) => {
+  const user = verifyRequest(req);
+  if (!user) return res.redirect('/login.html?next=/');
+  const firstAllowed = (user.allowedDashboards || []).find((key) => ROOT_DASHBOARD_URLS[key]);
+  res.redirect(firstAllowed ? ROOT_DASHBOARD_URLS[firstAllowed] : '/login.html');
+});
 
 // Login / logout / session-check - backed by the Dashboard_Access CRM module
 app.use('/api/auth', authRouter);
