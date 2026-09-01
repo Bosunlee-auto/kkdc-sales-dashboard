@@ -5,7 +5,6 @@
 <title>KKDC Sales Performance</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
-<script src="/drilldown.js"></script>
 <style>
   :root {
     --ink: #1a1d1f;
@@ -54,18 +53,6 @@
   }
   .chart-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   canvas { max-height: 320px; }
-  /* Agency/Account/Customer breakdown charts scale their own height by row
-     count (see renderAgencyChart etc.) - the 320px cap above would otherwise
-     squash bars thinner as row count grows, making Agency (25 rows) look
-     wispy next to Account (15 rows) at the same fixed height (2026-08-27). */
-  #agencyChart, #accountChart, #customerChart { max-height: none; }
-  /* Latency histogram canvases get their height set directly on their parent
-     div via JS in renderLatencyAnalysis (same proven pattern as the
-     breakdown charts above) - just need max-height removed here so the
-     320px cap doesn't fight that explicit height (2026-08-27). */
-  #latencyLinkedQ2OChart, #latencyFirstQ2OChart, #latencyO2SChart, #latencyVendorChart, #latencyVendorESDChart {
-    max-height: none;
-  }
   #ytdCompareTable th, #ytdCompareTable td { padding: 8px 10px; text-align: right; border-bottom: 0.5px solid var(--line); }
   #ytdCompareTable th:first-child, #ytdCompareTable td:first-child { text-align: left; }
   #ytdCompareTable th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -290,16 +277,17 @@
   <div id="latencyDataQuality" style="font-size:11px;color:var(--muted);margin-top:12px;"></div>
 </div>
 
-<div class="chart-card">
-  <div class="chart-header"><h2>By agency — order value (selected range)</h2><button class="table-toggle" data-target="agency">📊 Table</button></div>
-  <canvas id="agencyChart"></canvas>
-  <div id="agencyTable" class="data-table" style="display:none;"></div>
-</div>
-
-<div class="chart-card">
-  <div class="chart-header"><h2>By account — specifier/designer, top 15 (selected range)</h2><button class="table-toggle" data-target="account">📊 Table</button></div>
-  <canvas id="accountChart"></canvas>
-  <div id="accountTable" class="data-table" style="display:none;"></div>
+<div class="grid2">
+  <div class="chart-card">
+    <div class="chart-header"><h2>By agency — order value (selected range)</h2><button class="table-toggle" data-target="agency">📊 Table</button></div>
+    <canvas id="agencyChart"></canvas>
+    <div id="agencyTable" class="data-table" style="display:none;"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h2>By account — specifier/designer, top 15 (selected range)</h2><button class="table-toggle" data-target="account">📊 Table</button></div>
+    <canvas id="accountChart"></canvas>
+    <div id="accountTable" class="data-table" style="display:none;"></div>
+  </div>
 </div>
 
 <div class="chart-card">
@@ -427,9 +415,16 @@ async function loadQuotaSection(year) {
   const settingsForThisYear = settingsForYear(year);
   qpSettings = settingsForThisYear; // used by renderQuotaBar via the qpSettings variable, NOT the shared `settings`
 
-  const quotaRes = await fetch(`/api/sales-performance?from=${qFrom}&to=${qTo}&granularity=year`);
-  const { data: quotaData } = await quotaRes.json();
-  renderQuotaProgress(quotaData);
+  // Fetched separately per office (not derived from one combined call) so
+  // this always matches the NY Sales / NJ Sales pages exactly - see the
+  // fix note in renderQuotaProgress above.
+  const [nyRes, njRes] = await Promise.all([
+    fetch(`/api/sales-performance?from=${qFrom}&to=${qTo}&granularity=year&office=NY`),
+    fetch(`/api/sales-performance?from=${qFrom}&to=${qTo}&granularity=year&office=NJ`)
+  ]);
+  const { data: nyData } = await nyRes.json();
+  const { data: njData } = await njRes.json();
+  renderQuotaProgress(nyData, njData);
 }
 
 // Sums actual Shipped (NY/NJ) from earliestYear-01-01 through today, and
@@ -582,27 +577,6 @@ function renderFunnelChart(data) {
   const combinedQuota = perPeriod(settings.nj.quotaAnnual + settings.ny.quotaAnnual, granularity);
   const flat = (v) => data.map(() => v);
 
-  const funnelOptions = {
-    responsive: true,
-    plugins: { legend: { position: 'bottom' } },
-    scales: {
-      y: {
-        position: 'left',
-        title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } },
-        ticks: { callback: v => fmtUSD(v) }
-      },
-      y1: {
-        position: 'right',
-        title: { display: true, text: 'Order PO / Shipped+ESD / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } },
-        grid: { drawOnChartArea: false },
-        ticks: { callback: v => fmtUSD(v) }
-      }
-    }
-  };
-  // Click a Quote/Order PO/Shipped+ESD/Shipped point to see the underlying
-  // Sales_Orders records, same as the native CRM Analytics drill-down (2026-08-26)
-  attachFunnelDrilldownOnClick(funnelOptions, 'TOTAL', () => document.getElementById('granularity').value);
-
   charts.funnel = new Chart(ctx, {
     type: 'line',
     data: {
@@ -616,29 +590,45 @@ function renderFunnelChart(data) {
         { label: 'Combined Quota', data: flat(combinedQuota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
       ]
     },
-    options: funnelOptions
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } },
+          ticks: { callback: v => fmtUSD(v) }
+        },
+        y1: {
+          position: 'right',
+          title: { display: true, text: 'Order PO / Shipped+ESD / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } },
+          grid: { drawOnChartArea: false },
+          ticks: { callback: v => fmtUSD(v) }
+        }
+      }
+    }
   });
 }
 
-function renderQuotaProgress(data) {
-  const nyShipped = sum(data, 'shippedAmountNY');
-  const njShipped = sum(data, 'shippedAmountNJ');
-  // Shipped+ESD isn't tracked separately per NY/NJ office in the combined
-  // dataset (shippedPlusESDAmount is a Total-Sales-wide field) - approximate
-  // using each office's share of Shipped as a proxy weight. This is a known
-  // simplification for the Total Sales combined view only; the single-office
-  // NY/NJ pages use their own exact shippedPlusESDAmount instead (see below).
-  const totalShipped = nyShipped + njShipped;
-  const totalShippedESD = sum(data, 'shippedPlusESDAmount');
-  const nyShare = totalShipped > 0 ? nyShipped / totalShipped : 0;
-  const njShare = totalShipped > 0 ? njShipped / totalShipped : 0;
-
-  const nyQuote = sum(data, 'quoteAmount') * nyShare; // approximate split, same caveat as above
-  const njQuote = sum(data, 'quoteAmount') * njShare;
+function renderQuotaProgress(nyData, njData) {
+  // FIXED 2026-08-25 (Bosun cross-check): previously approximated NY/NJ's
+  // Shipped+ESD split by weighting a single combined-dataset ESD total by
+  // each office's Shipped share - this diverged from the NY/NJ individual
+  // pages' own EXACT calculations (confirmed live: NY showed $206,355 ESD
+  // here vs $250,185 on the real NY Sales page; NJ showed $88,433 here vs
+  // $19,148 on the real NJ Sales page). Now fetches NY and NJ separately
+  // via office=NY / office=NJ (see loadQuotaSection), the exact same calls
+  // the individual pages make, so all three pages always agree exactly.
+  const nyShipped = sum(nyData, 'shippedAmount');
+  const njShipped = sum(njData, 'shippedAmount');
+  const nyShippedESD = sum(nyData, 'shippedPlusESDAmount');
+  const njShippedESD = sum(njData, 'shippedPlusESDAmount');
+  const nyQuote = sum(nyData, 'quoteAmount');
+  const njQuote = sum(njData, 'quoteAmount');
 
   const bars = [
-    { name: 'NY', shipped: nyShipped, shippedESD: totalShippedESD * nyShare, quote: nyQuote, bep: qpSettings.ny.bepAnnual, quota: qpSettings.ny.quotaAnnual },
-    { name: 'NJ', shipped: njShipped, shippedESD: totalShippedESD * njShare, quote: njQuote, bep: qpSettings.nj.bepAnnual, quota: qpSettings.nj.quotaAnnual }
+    { name: 'NY', shipped: nyShipped, shippedESD: nyShippedESD, quote: nyQuote, bep: qpSettings.ny.bepAnnual, quota: qpSettings.ny.quotaAnnual },
+    { name: 'NJ', shipped: njShipped, shippedESD: njShippedESD, quote: njQuote, bep: qpSettings.nj.bepAnnual, quota: qpSettings.nj.quotaAnnual }
   ];
 
   const html = bars.map((b) => renderQuotaBar(b)).join('');
@@ -739,13 +729,6 @@ function renderLatencyAnalysis(latency) {
 
   const fmtDays = (v) => v === null || v === undefined ? 'n/a' : v.toFixed(1) + ' days';
 
-  // Fixed compact height for these 5 canvases' parent divs - Chart.js reads
-  // the parent's size (not the canvas's own CSS) to decide render height, so
-  // this must be set here rather than via a CSS canvas rule (2026-08-27).
-  ['latencyLinkedQ2OChart', 'latencyFirstQ2OChart', 'latencyO2SChart', 'latencyVendorChart', 'latencyVendorESDChart'].forEach((id) => {
-    document.getElementById(id).parentElement.style.height = '160px';
-  });
-
   document.getElementById('latencyStats').innerHTML = `
     <div class="kpi"><div class="label">Final Quote → Order (median)</div><div class="value">${fmtDays(linkedQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(linkedQ2O.avgDays)} · n=${linkedQ2O.count || 0}</div></div>
     <div class="kpi"><div class="label">First Quote → Order (median)</div><div class="value">${fmtDays(firstQ2O.medianDays)}</div><div style="font-size:11px;color:var(--muted);">avg ${fmtDays(firstQ2O.avgDays)} · n=${firstQ2O.count || 0}</div></div>
@@ -758,45 +741,45 @@ function renderLatencyAnalysis(latency) {
     type: 'bar',
     data: {
       labels: (linkedQ2O.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Orders', data: (linkedQ2O.distribution || []).map(d => d.count), backgroundColor: '#f59e0b', maxBarThickness: 48 }]
+      datasets: [{ label: 'Orders', data: (linkedQ2O.distribution || []).map(d => d.count), backgroundColor: '#f59e0b' }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
   charts.latencyFirstQ2O = new Chart(document.getElementById('latencyFirstQ2OChart'), {
     type: 'bar',
     data: {
       labels: (firstQ2O.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Orders', data: (firstQ2O.distribution || []).map(d => d.count), backgroundColor: '#7c3aed', maxBarThickness: 48 }]
+      datasets: [{ label: 'Orders', data: (firstQ2O.distribution || []).map(d => d.count), backgroundColor: '#7c3aed' }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
   charts.latencyO2S = new Chart(document.getElementById('latencyO2SChart'), {
     type: 'bar',
     data: {
       labels: (o2s.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Orders', data: (o2s.distribution || []).map(d => d.count), backgroundColor: '#dc2626', maxBarThickness: 48 }]
+      datasets: [{ label: 'Orders', data: (o2s.distribution || []).map(d => d.count), backgroundColor: '#dc2626' }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
   charts.latencyVendor = new Chart(document.getElementById('latencyVendorChart'), {
     type: 'bar',
     data: {
       labels: (vendor.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Vendor POs', data: (vendor.distribution || []).map(d => d.count), backgroundColor: '#2563eb', maxBarThickness: 48 }]
+      datasets: [{ label: 'Vendor POs', data: (vendor.distribution || []).map(d => d.count), backgroundColor: '#2563eb' }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
   charts.latencyVendorESD = new Chart(document.getElementById('latencyVendorESDChart'), {
     type: 'bar',
     data: {
       labels: (vendorESD.distribution || []).map(d => d.label),
-      datasets: [{ label: 'Vendor POs', data: (vendorESD.distribution || []).map(d => d.count), backgroundColor: '#93c5fd', maxBarThickness: 48 }]
+      datasets: [{ label: 'Vendor POs', data: (vendorESD.distribution || []).map(d => d.count), backgroundColor: '#93c5fd' }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
   document.getElementById('latencyDataQuality').innerHTML =
@@ -822,48 +805,25 @@ function renderYoYChart(yoy) {
   });
 }
 
-// Agency/Account/Customer charts render as separate canvases and each would
-// normally auto-size its own y-axis label column to its longest label -
-// since agency codes ("LGT") and full company names ("Kugler Ning Lighting
-// Design (KNL) NYC") are wildly different lengths, the three charts' bars
-// started at different x-positions when stacked, so they looked visually
-// misaligned even though each chart was individually correct (2026-08-27).
-// Fix: force every breakdown chart to the same label-column width via
-// afterFit, and truncate long names (full name still shows in the tooltip)
-// so they don't overflow past that fixed column into the bars.
-const BREAKDOWN_LABEL_COLUMN_WIDTH = 220;
-function truncateChartLabel(str, max = 26) {
-  if (!str) return str;
-  return str.length > max ? str.slice(0, max - 1) + '…' : str;
-}
-
 function renderAgencyChart(rows) {
   const ctx = document.getElementById('agencyChart');
   const top = rows.slice(0, 25);
-  const fullNames = top.map(r => r.name);
-  const chartHeight = Math.max(280, top.length * 26);
+  const chartHeight = Math.max(280, top.length * 22);
   ctx.parentElement.style.height = chartHeight + 'px';
   charts.agency = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: top.map(r => truncateChartLabel(r.name)),
+      labels: top.map(r => r.name),
       datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#8b5cf6' }]
     },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
-      },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
-    }
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 }
 
 function renderAccountChart(rows) {
   const ctx = document.getElementById('accountChart');
   const top = rows.slice(0, 15);
-  const fullNames = top.map(r => r.name);
-  const chartHeight = Math.max(280, top.length * 26);
+  const chartHeight = Math.max(280, top.length * 22);
   ctx.parentElement.style.height = chartHeight + 'px';
   charts.account = new Chart(ctx, {
     type: 'bar',
@@ -871,38 +831,25 @@ function renderAccountChart(rows) {
       // Canvas fillStyle cannot resolve CSS custom properties like 'var(--ny)' -
       // that was silently falling back to black, which is why this chart looked
       // like a solid black block. Using the actual hex value fixes it.
-      labels: top.map(r => truncateChartLabel(r.name)),
+      labels: top.map(r => r.name),
       datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#2563eb' }]
     },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
-      },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
-    }
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 }
 
 function renderCustomerChart(rows) {
   const ctx = document.getElementById('customerChart');
   const top = rows.slice(0, 15);
-  const fullNames = top.map(r => r.name);
-  const chartHeight = Math.max(280, top.length * 26);
+  const chartHeight = Math.max(280, top.length * 22);
   ctx.parentElement.style.height = chartHeight + 'px';
   charts.customer = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: top.map(r => truncateChartLabel(r.name)),
+      labels: top.map(r => r.name),
       datasets: [{ label: 'Order value', data: top.map(r => r.amount), backgroundColor: '#f59e0b' }]
     },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { title: (items) => fullNames[items[0].dataIndex] } }
-      },
-      scales: { y: { afterFit: (scale) => { scale.width = BREAKDOWN_LABEL_COLUMN_WIDTH; }, ticks: { autoSkip: false, font: { size: 11 } } } }
-    }
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 }
 
