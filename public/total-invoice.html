@@ -1,355 +1,428 @@
-// lib/invoiceDashboard.js
-// Total Invoice dashboard. Sourced from Invoices - this is the ONLY one of the
-// 4 dashboards that uses the full invoiced amount (freight/duty/S&H included),
-// per Bosun (2026-08-23): "Only net product sales figures matter" for the
-// Sales dashboards, but the Invoice dashboard exists specifically to show the
-// real, total invoiced dollar figure.
-//
-// REVISED 2026-08-25 per Bosun - major correction to how "Invoice" totals are
-// categorized:
-//
-//   Invoices.Invoice_Category ("Invoice" vs "Proforma") is NOT a financial
-//   status field. It exists purely to pick which automated email template to
-//   send (an invoice-with-due-date email vs. a proforma "pending payment"
-//   email), and once set, it is NEVER updated afterward even after the order
-//   ships and gets paid. Using it to distinguish "real" vs "pending" revenue
-//   was wrong - confirmed live: 90% of "Proforma"-tagged invoices in the
-//   2026 window actually had a Ship_Date from many months earlier, because
-//   the category field simply never got revisited once the order actually
-//   shipped. Proforma vs Invoice is dropped entirely from this file; every
-//   valid invoice is just "an invoice."
-//
-//   Similarly, Invoices.Status ("Overdue" etc.) is ALSO not reliable as a
-//   live indicator - confirmed live: querying Status='Overdue' returns 200+
-//   records going back to 2019, which cannot possibly still be genuinely
-//   outstanding after 6+ years. The field is set once and not revisited.
-//
-// The new, correct 4-way split (per Bosun, 2026-08-25) is based purely on
-// the LINKED SALES ORDER's status, plus a manually-curated overdue snapshot
-// (see OVERDUE_SNAPSHOT below) for the one thing that genuinely can't be
-// derived reliably from CRM fields alone:
-//
-//   1. Shipped (Recognized)   - linked SO.Status = 'Shipped'. Full invoiced
-//                               amount counts as real, recognized revenue
-//                               REGARDLESS of whether payment has been
-//                               received yet - shipping, not payment, is
-//                               what makes it "closed" revenue for Bosun.
-//   2. Overdue                - the subset of #1 that is ACTUALLY still
-//                               outstanding right now. Confirmed with Bosun
-//                               (2026-08-25): Invoices.Status='Overdue' data
-//                               has been cleaned up and IS trustworthy for
-//                               Invoice_Date >= 2025-01-01 (before that,
-//                               it's stale legacy noise going back to 2019
-//                               that was never revisited). Sourced live via
-//                               a separate query: Status='Overdue' AND
-//                               Invoice_Date >= '2025-01-01' - verified live
-//                               to match Bosun's CRM export exactly (9
-//                               invoices, $20,962.06, 2026-09-04). Uses each
-//                               invoice's outstanding BALANCE, not its
-//                               original full Amount, since partial
-//                               payments may already be applied. Bucketed by
-//                               Invoice_Date (not Ship_Date - 2 of the 9 has
-//                               no Ship_Date at all) into whichever period
-//                               contains today, since this is inherently a
-//                               "right now" snapshot rather than a
-//                               historical time-series metric.
-//   3. Scheduled               - linked SO.Status is NOT Shipped (and not
-//                               Superceded/On Hold/Cancelled), AND the
-//                               invoice has a Ship_Date (ESD) on file.
-//                               Counted regardless of payment status - these
-//                               are considered close to certain to happen.
-//   4. Forecast                - linked SO.Status is NOT Shipped (and not
-//                               excluded), and there is NO Ship_Date yet -
-//                               too early-stage to even have a scheduled
-//                               date, so tracked separately as pipeline.
-//
-// #1, #3, #4 are mutually exclusive and sum to the total valid invoice
-// universe. #2 is a subset flag layered on top of #1, not a separate bucket
-// in the total.
-//
-// Margin calculation (unchanged from the original version):
-//   Margin = Net_Product_Value1
-//            - Gen_Cost_TTL      (Cost of Goods, from the LINKED Sales_Order)
-//            - Freight           (SO.Freight_Amount_Domestic + SO.Post_Factory_Freight)
-//            - Tariff            (computed - see schedule below)
-// Cost and Freight live on Sales_Orders, not Invoices, so we join via the
-// Invoices.Sales_Order lookup field (confirmed live 2026-08-23: some older
-// invoices have a null Sales_Order lookup - those are margin-excluded and
-// flagged in the result rather than silently guessed at).
-//
-// Tariff schedule (confirmed with Bosun 2026-08-23, based on actual duty
-// paid): rate is applied to Net_Product_Value1, keyed by Ship_Date (NOT
-// Invoice_Date - confirmed explicitly).
-//   2025-04-01 to 2025-07-31          : Net_Product_Value1 * 0.5 * 0.10   (5.0%)
-//   2025-08-01 to 2026-03-31          : Net_Product_Value1 * 0.5 * 0.189  (9.45%)
-//   2026-04-01 to present             : Net_Product_Value1 * 0.5 * 0.10   (5.0%)
-// Invoices with a Ship_Date outside all three windows (i.e. before
-// 2025-04-01) get no tariff applied - the schedule doesn't reach back that far.
-
-const { coqlQuery } = require('./zoho');
-
-const EXCLUDED_SO_STATUSES = ['Superceded', 'Order On Hold', 'Order Cancelled'];
-
-const TARIFF_SCHEDULE = [
-  { from: '2025-04-01', to: '2025-07-31', rate: 0.5 * 0.10 },
-  { from: '2025-08-01', to: '2026-03-31', rate: 0.5 * 0.189 },
-  { from: '2026-04-01', to: '9999-12-31', rate: 0.5 * 0.10 }
-];
-
-function tariffRateFor(shipDateStr) {
-  if (!shipDateStr) return null;
-  const d = shipDateStr.slice(0, 10); // YYYY-MM-DD
-  for (const window of TARIFF_SCHEDULE) {
-    if (d >= window.from && d <= window.to) return window.rate;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KKDC Sales Performance — Total Invoice</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="/auth-guard.js"></script>
+<style>
+  :root {
+    --ink: #1a1d1f;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --ny: #2563eb;
+    --nj: #059669;
+    --combined: #1a1d1f;
+    --lost: #dc2626;
   }
-  return null; // outside schedule - no tariff data for this period
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .controls {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;
+  }
+  .controls label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  select, input {
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 13px; background: var(--card); color: var(--ink);
+  }
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 12px; }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .kpi .value { font-size: 14px; font-weight: 600; margin-top: 3px; }
+  .kpi .yoy { font-size: 12px; margin-top: 2px; }
+  .yoy.up { color: var(--nj); }
+  .yoy.down { color: var(--lost); }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .chart-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  canvas { max-height: 320px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .note {
+    font-size: 12px; color: var(--muted); background: #fff9db; border: 1px solid #f5e19b;
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 20px;
+  }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .chart-header h2 { margin: 0; }
+  .table-toggle {
+    font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .table-toggle:hover { border-color: var(--ink); color: var(--ink); }
+  .table-toggle.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .data-table { max-height: 340px; overflow: auto; }
+  .data-table table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .data-table th, .data-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .data-table th:first-child, .data-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  .data-table th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px; }
+  .spinner-overlay {
+    position: fixed; inset: 0; background: rgba(250,250,250,0.7);
+    display: none; align-items: center; justify-content: center; z-index: 9999;
+  }
+  .spinner-overlay.active { display: flex; }
+  .spinner {
+    width: 36px; height: 36px; border: 4px solid var(--line); border-top-color: var(--ink);
+    border-radius: 50%; animation: kkdc-spin 0.8s linear infinite;
+  }
+  @keyframes kkdc-spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body data-dashboard="TOTAL_INVOICE">
+<div class="spinner-overlay" id="spinnerOverlay"><div class="spinner"></div></div>
+
+<h1>KKDC Sales Performance — Total Invoice</h1>
+<div class="sub">Invoices · full invoiced Amount (freight, tariff, and S&H included) — the only dashboard of the 4 that isn't net-product-only</div>
+
+<div class="note">
+  Margin = Net Product Value − Cost of Goods (from linked Sales Order) − Freight − Tariff (rate schedule by Ship Date: 5.0% Apr–Jul 2025, 9.45% Aug 2025–Mar 2026, 5.0% Apr 2026–present).
+  Invoices with no linked Sales Order, or a Ship Date outside the tariff schedule, are excluded from margin totals rather than estimated — see "Margin excluded" below.
+</div>
+
+<div class="controls">
+  <label>From <input type="date" id="from"></label>
+  <label>To <input type="date" id="to"></label>
+  <label>Granularity
+    <select id="granularity">
+      <option value="month">Month</option>
+      <option value="quarter">Quarter</option>
+      <option value="year">Year</option>
+    </select>
+  </label>
+  <label>&nbsp;
+    <button id="refresh" style="padding:6px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;">Refresh</button>
+  </label>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>Invoice Amount — by status and office</h2></div>
+  <div class="note" style="margin-bottom:12px;">
+    Full invoiced amount (Net Product Value + Freight/S&amp;H + Tariff), for the date range and Ship_Date window selected above. <b>Shipped</b> = actually shipped (linked Sales Order Status = Shipped), regardless of payment status. <b>Overdue</b> is a subset of Shipped that's still unpaid past due. <b>Scheduled</b> = not yet shipped but has an ESD (Ship_Date) on file. <b>Forecast</b> = not yet shipped, no ESD yet.
+  </div>
+  <table class="qp-metrics" style="margin-bottom:20px;">
+    <tr><th style="text-align:left;">Invoice Amount</th><th>Combined</th><th>NY</th><th>NJ</th></tr>
+    <tr id="rowInvShipped"></tr>
+    <tr id="rowInvOverdue"></tr>
+    <tr id="rowInvScheduled"></tr>
+    <tr id="rowInvForecast"></tr>
+    <tr id="rowInvTotal" style="border-top:2px solid var(--ink);"></tr>
+  </table>
+
+  <div class="chart-header"><h2>Net Product Value — by status and office</h2></div>
+  <div class="note" style="margin-bottom:12px;">
+    Same Shipped / Scheduled / Forecast split as above, but BEFORE Freight/S&amp;H/Tariff are added — this is the pure product-value subtotal used as the base for Margin and Tariff calculations.
+  </div>
+  <table class="qp-metrics" style="margin-bottom:20px;">
+    <tr><th style="text-align:left;">Net Product Value</th><th>Combined</th><th>NY</th><th>NJ</th></tr>
+    <tr id="rowNpvShipped"></tr>
+    <tr id="rowNpvScheduled"></tr>
+    <tr id="rowNpvForecast"></tr>
+    <tr id="rowNpvTotal" style="border-top:2px solid var(--ink);"></tr>
+  </table>
+
+  <div class="chart-header"><h2>Margin &amp; Overage — across all valid invoices (Shipped + Scheduled + Forecast)</h2></div>
+  <div class="note" style="margin-bottom:12px;">
+    Margin = Net Product Value − Cost of Goods (from linked Sales Order) − Freight − Tariff, computed per invoice using its own Ship_Date-based tariff rate. Not split by Shipped/Scheduled/Forecast - shown as one total across all valid invoices in range, since cost/tariff attribution doesn't depend on shipment timing.
+  </div>
+  <table class="qp-metrics">
+    <tr><th style="text-align:left;">Metric</th><th>Combined</th><th>NY</th><th>NJ</th></tr>
+    <tr id="rowMargin"></tr>
+    <tr id="rowOverageAgency"></tr>
+    <tr id="rowOverageCompany"></tr>
+    <tr id="rowCostFreightTariff"></tr>
+  </table>
+  <div id="marginExcludedNote" style="font-size:11px;color:var(--lost);margin-top:8px;"></div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>Invoice total vs. net product value</h2><button class="table-toggle" data-target="invoice">📊 Table</button></div>
+  <canvas id="invoiceChart"></canvas>
+  <div id="invoiceTable" class="data-table" style="display:none;"></div>
+</div>
+
+<div class="grid2">
+  <div class="chart-card">
+    <div class="chart-header"><h2>Overage — agency (80%) vs. KKDC (20%)</h2><button class="table-toggle" data-target="overage">📊 Table</button></div>
+    <canvas id="overageChart"></canvas>
+    <div id="overageTable" class="data-table" style="display:none;"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h2>Margin components</h2><button class="table-toggle" data-target="margin">📊 Table</button></div>
+    <canvas id="marginChart"></canvas>
+    <div id="marginTable" class="data-table" style="display:none;"></div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <div class="chart-header"><h2>Margin % over time</h2><button class="table-toggle" data-target="marginPct">📊 Table</button></div>
+  <canvas id="marginPctChart"></canvas>
+  <div id="marginPctTable" class="data-table" style="display:none;"></div>
+</div>
+
+<script>
+document.getElementById('to').value = new Date().toISOString().slice(0, 10);
+document.getElementById('from').value = `${new Date().getFullYear()}-01-01`; // default: this year, Jan 1 to today
+
+const fmtUSD = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+if (window.ChartDataLabels) {
+  Chart.register(ChartDataLabels);
+  Chart.defaults.set('plugins.datalabels', { display: false }); // opt-in per chart, not global default
+}
+let charts = {};
+let lastData = [];
+function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
+function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
+
+function showSpinner() { document.getElementById('spinnerOverlay').classList.add('active'); }
+function hideSpinner() { document.getElementById('spinnerOverlay').classList.remove('active'); }
+
+async function loadDashboard() {
+  showSpinner();
+  try {
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    const granularity = document.getElementById('granularity').value;
+
+    const res = await fetch(`/api/dashboard/total-invoice?from=${from}&to=${to}&granularity=${granularity}`);
+    const { data, error } = await res.json();
+    if (error) { alert(error); return; }
+
+    lastData = data;
+
+    renderKPIs(data);
+    renderInvoiceChart(data);
+    renderOverageChart(data);
+    renderMarginChart(data);
+    renderMarginPctChart(data);
+  } finally {
+    hideSpinner();
+  }
 }
 
-function periodKey(dateStr, granularity) {
-  const d = new Date(dateStr);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  if (granularity === 'year') return `${y}`;
-  if (granularity === 'quarter') return `${y}-Q${Math.floor(m / 3) + 1}`;
-  return `${y}-${String(m + 1).padStart(2, '0')}`;
-}
+function renderKPIs(data) {
+  // --- Invoice Amount table (full invoiced $, incl. Freight/S&H/Tariff) ---
+  const invShipped = sum(data, 'invoiceShippedTotal');
+  const invShippedNY = sum(data, 'invoiceShippedTotalNY');
+  const invShippedNJ = sum(data, 'invoiceShippedTotalNJ');
+  const invOverdue = sum(data, 'invoiceOverdueTotal');
+  const invOverdueNY = sum(data, 'invoiceOverdueTotalNY');
+  const invOverdueNJ = sum(data, 'invoiceOverdueTotalNJ');
+  const invScheduled = sum(data, 'invoiceScheduledTotal');
+  const invScheduledNY = sum(data, 'invoiceScheduledTotalNY');
+  const invScheduledNJ = sum(data, 'invoiceScheduledTotalNJ');
+  const invForecast = sum(data, 'invoiceForecastTotal');
+  const invForecastNY = sum(data, 'invoiceForecastTotalNY');
+  const invForecastNJ = sum(data, 'invoiceForecastTotalNJ');
+  // Total = Shipped + Scheduled + Forecast (mutually exclusive). Overdue is
+  // a SUBSET of Shipped shown for visibility, never added into the total.
+  const invTotal = invShipped + invScheduled + invForecast;
+  const invTotalNY = invShippedNY + invScheduledNY + invForecastNY;
+  const invTotalNJ = invShippedNJ + invScheduledNJ + invForecastNJ;
 
-function emptyPeriod() {
-  return {
-    invoiceTotal: 0,        // Amount - full invoiced value, freight/duty/S&H included
-    invoiceTotalNY: 0,
-    invoiceTotalNJ: 0,
-    invoiceCount: 0,
-
-    // The 4-way split - see the big comment at the top of this file.
-    invoiceShippedTotal: 0,      // #1 - full amount, linked SO Status='Shipped'
-    invoiceShippedTotalNY: 0,
-    invoiceShippedTotalNJ: 0,
-    invoiceOverdueTotal: 0,      // #2 - subset of #1, from OVERDUE_SNAPSHOT (uses Balance, not Amount)
-    invoiceOverdueTotalNY: 0,
-    invoiceOverdueTotalNJ: 0,
-    invoiceScheduledTotal: 0,    // #3 - not shipped, has a Ship_Date (ESD)
-    invoiceScheduledTotalNY: 0,
-    invoiceScheduledTotalNJ: 0,
-    invoiceForecastTotal: 0,     // #4 - not shipped, no Ship_Date yet
-    invoiceForecastTotalNY: 0,
-    invoiceForecastTotalNJ: 0,
-
-    netProductValue: 0,     // Net_Product_Value1, subtotal before freight/duty/S&H (all valid = Shipped+Scheduled+Forecast)
-    netProductValueNY: 0,
-    netProductValueNJ: 0,
-    netProductValueShipped: 0,
-    netProductValueShippedNY: 0,
-    netProductValueShippedNJ: 0,
-    netProductValueScheduled: 0,
-    netProductValueScheduledNY: 0,
-    netProductValueScheduledNJ: 0,
-    netProductValueForecast: 0,
-    netProductValueForecastNY: 0,
-    netProductValueForecastNJ: 0,
-    overageAgencyShare: 0,
-    overageCompanyShare: 0,
-    costOfGoods: 0,
-    freightTotal: 0,
-    tariffTotal: 0,
-    marginTotal: 0,
-    marginTotalNY: 0,
-    marginTotalNJ: 0,
-    marginExcludedCount: 0, // invoices with no linked Sales_Order or no tariff-schedule match
-    marginExcludedValue: 0
+  const row = (id, label, combined, ny, nj, opts) => {
+    opts = opts || {};
+    const style = opts.indent ? 'padding-left:20px;color:var(--muted);' : (opts.bold ? 'font-weight:700;' : '');
+    const nyCell = ny === null ? '—' : fmtUSD(ny);
+    const njCell = nj === null ? '—' : fmtUSD(nj);
+    document.getElementById(id).innerHTML =
+      `<td style="text-align:left;${style}">${label}</td><td>${fmtUSD(combined)}</td><td>${nyCell}</td><td>${njCell}</td>`;
   };
+
+  row('rowInvShipped', 'Shipped (Recognized)', invShipped, invShippedNY, invShippedNJ);
+  row('rowInvOverdue', '↳ of which Overdue (unpaid)', invOverdue, invOverdueNY, invOverdueNJ, { indent: true });
+  row('rowInvScheduled', 'Scheduled (has ESD)', invScheduled, invScheduledNY, invScheduledNJ);
+  row('rowInvForecast', 'Forecast (no ESD yet)', invForecast, invForecastNY, invForecastNJ);
+  row('rowInvTotal', 'Total (Shipped + Scheduled + Forecast)', invTotal, invTotalNY, invTotalNJ, { bold: true });
+
+  // --- Net Product Value table (before Freight/S&H/Tariff) ---------------
+  const npvShipped = sum(data, 'netProductValueShipped');
+  const npvShippedNY = sum(data, 'netProductValueShippedNY');
+  const npvShippedNJ = sum(data, 'netProductValueShippedNJ');
+  const npvScheduled = sum(data, 'netProductValueScheduled');
+  const npvScheduledNY = sum(data, 'netProductValueScheduledNY');
+  const npvScheduledNJ = sum(data, 'netProductValueScheduledNJ');
+  const npvForecast = sum(data, 'netProductValueForecast');
+  const npvForecastNY = sum(data, 'netProductValueForecastNY');
+  const npvForecastNJ = sum(data, 'netProductValueForecastNJ');
+  const npvTotal = npvShipped + npvScheduled + npvForecast;
+  const npvTotalNY = npvShippedNY + npvScheduledNY + npvForecastNY;
+  const npvTotalNJ = npvShippedNJ + npvScheduledNJ + npvForecastNJ;
+
+  row('rowNpvShipped', 'Shipped (Recognized)', npvShipped, npvShippedNY, npvShippedNJ);
+  row('rowNpvScheduled', 'Scheduled (has ESD)', npvScheduled, npvScheduledNY, npvScheduledNJ);
+  row('rowNpvForecast', 'Forecast (no ESD yet)', npvForecast, npvForecastNY, npvForecastNJ);
+  row('rowNpvTotal', 'Total (Shipped + Scheduled + Forecast)', npvTotal, npvTotalNY, npvTotalNJ, { bold: true });
+
+  // --- Margin & Overage (combined across all statuses, see note above) ---
+  const margin = sum(data, 'marginTotal');
+  const marginNY = sum(data, 'marginTotalNY');
+  const marginNJ = sum(data, 'marginTotalNJ');
+  const overageAgency = sum(data, 'overageAgencyShare');
+  const overageCompany = sum(data, 'overageCompanyShare');
+  const costFreightTariff = sum(data, 'costOfGoods') + sum(data, 'freightTotal') + sum(data, 'tariffTotal');
+  const excludedCount = sum(data, 'marginExcludedCount');
+  const excludedValue = sum(data, 'marginExcludedValue');
+
+  row('rowMargin', 'Margin', margin, marginNY, marginNJ, { bold: true });
+  row('rowOverageAgency', 'Overage — Agency (80%)', overageAgency, null, null);
+  row('rowOverageCompany', 'Overage — KKDC (20%)', overageCompany, null, null);
+  row('rowCostFreightTariff', 'Cost + Freight + Tariff', costFreightTariff, null, null);
+
+  document.getElementById('marginExcludedNote').textContent =
+    excludedCount > 0
+      ? `Margin excluded for ${excludedCount} invoice(s) totaling ${fmtUSD(excludedValue)} — no linked Sales Order, or Ship Date outside the tariff schedule.`
+      : '';
 }
 
-function normalizeOffice(officeDiv) {
-  if (!officeDiv) return null;
-  const v = String(officeDiv).toLowerCase();
-  if (v.includes('nj')) return 'NJ';
-  if (v.includes('ny')) return 'NY';
-  return null;
-}
-
-async function getInvoiceDashboard(dateFrom, dateTo, granularity = 'month') {
-  const periods = {};
-  function bucket(key) {
-    if (!periods[key]) periods[key] = emptyPeriod();
-    return periods[key];
-  }
-
-  // Upper bound extended to Dec 31 of dateTo's year - matching the same fix
-  // applied to the Sales Performance dashboards (2026-08-25): scheduled
-  // (ESD) invoices should cover the whole remaining year, not just "today."
-  const esdCutoff = `${new Date(dateTo).getUTCFullYear()}-12-31`;
-
-  const invRows = await coqlQuery(
-    `SELECT Invoice_No, Amount, Net_Product_Value1, SHIP_DATE, Sales_Order, Office_Div, ` +
-      `Overage, Overage_Company_Share, Overage_Agency_Share ` +
-      `FROM Invoices WHERE (SHIP_DATE >= '${dateFrom}') AND (SHIP_DATE <= '${esdCutoff}')`
-  );
-
-  // Batch-fetch cost/freight/status from linked Sales_Orders. Not all
-  // invoices have a linked SO (confirmed live) - those get margin fields
-  // excluded, not estimated. Status determines (a) exclusion of
-  // Superceded/On Hold/Cancelled orders and (b) the Shipped vs
-  // Scheduled/Forecast split.
-  const soIds = [...new Set(invRows.map((r) => r.Sales_Order && r.Sales_Order.id).filter(Boolean))];
-  const soDataById = {};
-  const CHUNK = 50; // Zoho COQL's "id in (...)" caps at 50 values per query (confirmed live 2026-08-23)
-  for (let i = 0; i < soIds.length; i += CHUNK) {
-    const chunkIds = soIds.slice(i, i + CHUNK);
-    const idList = chunkIds.map((id) => `'${id}'`).join(',');
-    const soRows = await coqlQuery(
-      `SELECT id, Status, Gen_Cost_TTL, Freight_Amount_Domestic, Post_Factory_Freight FROM Sales_Orders WHERE id in (${idList})`
-    );
-    for (const so of soRows) {
-      soDataById[so.id] = {
-        status: so.Status,
-        cost: Number(so.Gen_Cost_TTL || 0),
-        freight: Number(so.Freight_Amount_Domestic || 0) + Number(so.Post_Factory_Freight || 0)
-      };
-    }
-  }
-
-  for (const row of invRows) {
-    const soId = row.Sales_Order && row.Sales_Order.id;
-    const soInfo = soId ? soDataById[soId] : null;
-
-    // Exclude invoices whose linked order is Superceded / On Hold /
-    // Cancelled - only valid invoices count toward any total below. An
-    // invoice with no linked SO at all is NOT excluded here (that only
-    // affects margin, handled further down) - it simply can't be checked
-    // against this exclusion list.
-    if (soInfo && EXCLUDED_SO_STATUSES.includes(soInfo.status)) continue;
-
-    const amount = Number(row.Amount || 0);
-    const netProductValue = Number(row.Net_Product_Value1 || 0);
-    const overageAgency = Number(row.Overage_Agency_Share || 0);
-    const overageCompany = Number(row.Overage_Company_Share || 0);
-
-    const b = bucket(periodKey(row.SHIP_DATE, granularity));
-    const office = normalizeOffice(row.Office_Div);
-    b.invoiceTotal += amount;
-    if (office === 'NY') b.invoiceTotalNY += amount;
-    else if (office === 'NJ') b.invoiceTotalNJ += amount;
-    b.invoiceCount += 1;
-    b.netProductValue += netProductValue;
-    if (office === 'NY') b.netProductValueNY += netProductValue;
-    else if (office === 'NJ') b.netProductValueNJ += netProductValue;
-    b.overageAgencyShare += overageAgency;
-    b.overageCompanyShare += overageCompany;
-
-    // The 4-way split (see the big comment at the top of this file).
-    // Overdue (#2) is NOT computed here - it's a subset of Shipped sourced
-    // from a separate live query below, since it needs its own date
-    // filter (Invoice_Date, not Ship_Date) and isn't reliably tied to
-    // whichever period this row's Ship_Date happens to fall into.
-    const isShipped = soInfo && soInfo.status === 'Shipped';
-    if (isShipped) {
-      b.invoiceShippedTotal += amount;
-      if (office === 'NY') b.invoiceShippedTotalNY += amount;
-      else if (office === 'NJ') b.invoiceShippedTotalNJ += amount;
-      b.netProductValueShipped += netProductValue;
-      if (office === 'NY') b.netProductValueShippedNY += netProductValue;
-      else if (office === 'NJ') b.netProductValueShippedNJ += netProductValue;
-    } else {
-      // Not shipped (and not excluded) - split by whether an ESD exists.
-      if (row.SHIP_DATE) {
-        b.invoiceScheduledTotal += amount;
-        if (office === 'NY') b.invoiceScheduledTotalNY += amount;
-        else if (office === 'NJ') b.invoiceScheduledTotalNJ += amount;
-        b.netProductValueScheduled += netProductValue;
-        if (office === 'NY') b.netProductValueScheduledNY += netProductValue;
-        else if (office === 'NJ') b.netProductValueScheduledNJ += netProductValue;
-      } else {
-        b.invoiceForecastTotal += amount;
-        if (office === 'NY') b.invoiceForecastTotalNY += amount;
-        else if (office === 'NJ') b.invoiceForecastTotalNJ += amount;
-        b.netProductValueForecast += netProductValue;
-        if (office === 'NY') b.netProductValueForecastNY += netProductValue;
-        else if (office === 'NJ') b.netProductValueForecastNJ += netProductValue;
-      }
-    }
-
-    const tariffRate = tariffRateFor(row.SHIP_DATE);
-
-    if (!soInfo || tariffRate === null) {
-      // Can't compute a trustworthy margin for this invoice - exclude from
-      // margin totals rather than silently treating missing data as zero.
-      b.marginExcludedCount += 1;
-      b.marginExcludedValue += amount;
-      continue;
-    }
-
-    const tariff = netProductValue * tariffRate;
-    const margin = netProductValue - soInfo.cost - soInfo.freight - tariff;
-
-    b.costOfGoods += soInfo.cost;
-    b.freightTotal += soInfo.freight;
-    b.tariffTotal += tariff;
-    b.marginTotal += margin;
-    if (office === 'NY') b.marginTotalNY += margin;
-    else if (office === 'NJ') b.marginTotalNJ += margin;
-  }
-
-  // --- Overdue (#2) - independent live query ------------------------------
-  // Confirmed with Bosun (2026-08-25): Status='Overdue' data has been
-  // cleaned up and is trustworthy from Invoice_Date >= 2025-01-01 onward
-  // (verified live to exactly match a real CRM export: 9 invoices,
-  // $20,962.06, as of 2026-09-04). Queried independently of the main
-  // Ship_Date-ranged invRows above, since 2 of these 9 have no Ship_Date at
-  // all and would otherwise never be fetched. Bucketed into whichever
-  // period contains today - this is a "right now" snapshot, not a
-  // historical time series, so it only appears when today falls within the
-  // requested date range (e.g. browsing a past year like 2024 correctly
-  // shows no Overdue figure).
-  const OVERDUE_FLOOR_DATE = '2025-01-01';
-  const overdueRows = await coqlQuery(
-    `SELECT Invoice_No, Balance, Office_Div, Sales_Order FROM Invoices ` +
-      `WHERE (Status = 'Overdue' AND Invoice_Date >= '${OVERDUE_FLOOR_DATE}')`
-  );
-  if (overdueRows.length > 0) {
-    const overdueSoIds = [...new Set(overdueRows.map((r) => r.Sales_Order && r.Sales_Order.id).filter(Boolean))];
-    const unseenSoIds = overdueSoIds.filter((id) => !soDataById[id]);
-    for (let i = 0; i < unseenSoIds.length; i += CHUNK) {
-      const chunkIds = unseenSoIds.slice(i, i + CHUNK);
-      const idList = chunkIds.map((id) => `'${id}'`).join(',');
-      const soRows = await coqlQuery(`SELECT id, Status FROM Sales_Orders WHERE id in (${idList})`);
-      for (const so of soRows) {
-        soDataById[so.id] = soDataById[so.id] || { status: so.Status, cost: 0, freight: 0 };
-      }
-    }
-
-    const todayKey = periodKey(new Date().toISOString().slice(0, 10), granularity);
-    const overdueBucket = bucket(todayKey);
-    for (const row of overdueRows) {
-      const soId = row.Sales_Order && row.Sales_Order.id;
-      const soInfo = soId ? soDataById[soId] : null;
-      if (soInfo && EXCLUDED_SO_STATUSES.includes(soInfo.status)) continue;
-
-      const balance = Number(row.Balance || 0);
-      const office = normalizeOffice(row.Office_Div);
-      overdueBucket.invoiceOverdueTotal += balance;
-      if (office === 'NY') overdueBucket.invoiceOverdueTotalNY += balance;
-      else if (office === 'NJ') overdueBucket.invoiceOverdueTotalNJ += balance;
-    }
-  }
-
-  const sortedKeys = Object.keys(periods).sort();
-  return sortedKeys.map((key) => {
-    const p = periods[key];
-    return {
-      period: key,
-      ...round2All(p),
-      marginPct: p.netProductValue > 0 ? (p.marginTotal / p.netProductValue) * 100 : null
-    };
+function renderInvoiceChart(data) {
+  charts.invoice = new Chart(document.getElementById('invoiceChart'), {
+    type: 'line',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Invoice Total', data: data.map(p => p.invoiceTotal), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2 },
+      { label: 'Net Product Value', data: data.map(p => p.netProductValue), borderColor: '#2563eb', borderWidth: 2, tension: 0.2 }
+    ]},
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
   });
 }
 
-function round2All(p) {
-  const out = {};
-  for (const k of Object.keys(p)) {
-    out[k] = Math.round((p[k] + Number.EPSILON) * 100) / 100;
-  }
-  return out;
+function renderOverageChart(data) {
+  const totals = data.map(p => (p.overageAgencyShare || 0) + (p.overageCompanyShare || 0));
+  charts.overage = new Chart(document.getElementById('overageChart'), {
+    data: { labels: data.map(p => p.period), datasets: [
+      { type: 'bar', label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b', stack: 'overage' },
+      { type: 'bar', label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f', stack: 'overage' },
+      { type: 'line', label: 'Total Overage', data: totals, borderColor: '#7c3aed', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7c3aed', fill: false }
+    ]},
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 24,
+          color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
+          font: { size: 10, weight: '600' },
+          formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        }
+      }
+    }
+  });
 }
 
-module.exports = { getInvoiceDashboard, tariffRateFor };
+function renderMarginChart(data) {
+  const totals = data.map(p => (p.costOfGoods || 0) + (p.freightTotal || 0) + (p.tariffTotal || 0) + (p.marginTotal || 0));
+  charts.margin = new Chart(document.getElementById('marginChart'), {
+    data: { labels: data.map(p => p.period), datasets: [
+      { type: 'bar', label: 'Cost of Goods', data: data.map(p => p.costOfGoods), backgroundColor: '#6b7280', stack: 'margin' },
+      { type: 'bar', label: 'Freight', data: data.map(p => p.freightTotal), backgroundColor: '#f59e0b', stack: 'margin' },
+      { type: 'bar', label: 'Tariff', data: data.map(p => p.tariffTotal), backgroundColor: '#dc2626', stack: 'margin' },
+      { type: 'bar', label: 'Margin', data: data.map(p => p.marginTotal), backgroundColor: '#059669', stack: 'margin' },
+      { type: 'line', label: 'Net Product Value', data: totals, borderColor: '#2563eb', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#2563eb', fill: false }
+    ]},
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 20,
+          color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
+          font: { size: 9, weight: '600' },
+          formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        }
+      }
+    }
+  });
+}
+
+function renderMarginPctChart(data) {
+  charts.marginPct = new Chart(document.getElementById('marginPctChart'), {
+    type: 'line',
+    data: { labels: data.map(p => p.period), datasets: [
+      { label: 'Margin %', data: data.map(p => p.marginPct), borderColor: '#059669', borderWidth: 2, tension: 0.2 }
+    ]},
+    options: { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } }
+  });
+}
+
+// --- Table view toggle (same pattern as Total Sales / NY / NJ) -----------
+function buildTable(headers, rows) {
+  const head = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+  const body = rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  return `<table>${head}${body}</table>`;
+}
+
+function renderInvoiceTable(data) {
+  document.getElementById('invoiceTable').innerHTML = buildTable(
+    ['Period', 'Invoice Total', 'Net Product Value'],
+    data.map(p => [p.period, fmtUSD(p.invoiceTotal), fmtUSD(p.netProductValue)])
+  );
+}
+function renderOverageTable(data) {
+  document.getElementById('overageTable').innerHTML = buildTable(
+    ['Period', 'Agency (80%)', 'KKDC (20%)'],
+    data.map(p => [p.period, fmtUSD(p.overageAgencyShare), fmtUSD(p.overageCompanyShare)])
+  );
+}
+function renderMarginTable(data) {
+  document.getElementById('marginTable').innerHTML = buildTable(
+    ['Period', 'Cost of Goods', 'Freight', 'Tariff', 'Margin'],
+    data.map(p => [p.period, fmtUSD(p.costOfGoods), fmtUSD(p.freightTotal), fmtUSD(p.tariffTotal), fmtUSD(p.marginTotal)])
+  );
+}
+function renderMarginPctTable(data) {
+  document.getElementById('marginPctTable').innerHTML = buildTable(
+    ['Period', 'Margin %'],
+    data.map(p => [p.period, p.marginPct !== null && p.marginPct !== undefined ? p.marginPct.toFixed(1) + '%' : 'n/a'])
+  );
+}
+
+function renderAllTables() {
+  renderInvoiceTable(lastData);
+  renderOverageTable(lastData);
+  renderMarginTable(lastData);
+  renderMarginPctTable(lastData);
+}
+
+document.querySelectorAll('.table-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.getAttribute('data-target');
+    const canvas = document.getElementById(target + 'Chart');
+    const tableDiv = document.getElementById(target + 'Table');
+    const showingTable = tableDiv.style.display !== 'none';
+    if (showingTable) {
+      tableDiv.style.display = 'none';
+      canvas.style.display = 'block';
+      btn.classList.remove('active');
+      btn.textContent = '📊 Table';
+    } else {
+      renderAllTables();
+      tableDiv.style.display = 'block';
+      canvas.style.display = 'none';
+      btn.classList.add('active');
+      btn.textContent = '📈 Chart';
+    }
+  });
+});
+
+document.getElementById('refresh').addEventListener('click', () => { destroyCharts(); loadDashboard(); });
+window.__authGuardReady.then(loadDashboard).catch(() => {});
+</script>
+</body>
+</html>
