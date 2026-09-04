@@ -43,6 +43,13 @@
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
     padding: 8px 10px;
   }
+  .qp-metrics { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .qp-metrics th { text-align: right; font-weight: 500; color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 10px 8px; border-bottom: 1px solid var(--line); }
+  .qp-metrics th:first-child { text-align: left; }
+  .qp-metrics td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .qp-metrics td:first-child { text-align: left; }
+  .qp-metrics tr:last-child td { border-bottom: none; }
   .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .kpi .value { font-size: 14px; font-weight: 600; margin-top: 3px; }
   .kpi .yoy { font-size: 12px; margin-top: 2px; }
@@ -113,16 +120,17 @@
 <div class="chart-card">
   <div class="chart-header"><h2>Invoice Amount — by status and office</h2></div>
   <div class="note" style="margin-bottom:12px;">
-    Full invoiced amount (Net Product Value + Freight/S&amp;H + Tariff), for the date range and Ship_Date window selected above. <b>Shipped</b> = actually shipped (linked Sales Order Status = Shipped), regardless of payment status. <b>Overdue</b> is a subset of Shipped that's still unpaid past due. <b>Scheduled</b> = not yet shipped but has an ESD (Ship_Date) on file. <b>Forecast</b> = not yet shipped, no ESD yet.
+    Full invoiced amount (Net Product Value + Freight/S&amp;H + Tariff), for the date range and Ship_Date window selected above. <b>Shipped</b> = actually shipped (linked Sales Order Status = Shipped), regardless of payment status. <b>Scheduled</b> = not yet shipped but has an ESD (Ship_Date) on file. <b>Forecast</b> = not yet shipped, no ESD yet, and the invoice is no older than 3 months (older = treated as effectively dead/cancelled).
   </div>
-  <table class="qp-metrics" style="margin-bottom:20px;">
+  <table class="qp-metrics" style="margin-bottom:8px;">
     <tr><th style="text-align:left;">Invoice Amount</th><th>Combined</th><th>NY</th><th>NJ</th></tr>
     <tr id="rowInvShipped"></tr>
-    <tr id="rowInvOverdue"></tr>
     <tr id="rowInvScheduled"></tr>
+    <tr id="rowInvSubtotal" style="border-top:1px solid var(--line);"></tr>
     <tr id="rowInvForecast"></tr>
     <tr id="rowInvTotal" style="border-top:2px solid var(--ink);"></tr>
   </table>
+  <div id="rowInvOverdueNote" style="font-size:12px;color:var(--lost);margin-bottom:20px;"></div>
 
   <div class="chart-header"><h2>Net Product Value — by status and office</h2></div>
   <div class="note" style="margin-bottom:12px;">
@@ -230,10 +238,14 @@ function renderKPIs(data) {
   const invForecastNY = sum(data, 'invoiceForecastTotalNY');
   const invForecastNJ = sum(data, 'invoiceForecastTotalNJ');
   // Total = Shipped + Scheduled + Forecast (mutually exclusive). Overdue is
-  // a SUBSET of Shipped shown for visibility, never added into the total.
-  const invTotal = invShipped + invScheduled + invForecast;
-  const invTotalNY = invShippedNY + invScheduledNY + invForecastNY;
-  const invTotalNJ = invShippedNJ + invScheduledNJ + invForecastNJ;
+  // a SUBSET of Shipped, shown as a reference note below - not a separate
+  // row, since it can only ever exist for already-shipped invoices.
+  const invSubtotal = invShipped + invScheduled;
+  const invSubtotalNY = invShippedNY + invScheduledNY;
+  const invSubtotalNJ = invShippedNJ + invScheduledNJ;
+  const invTotal = invSubtotal + invForecast;
+  const invTotalNY = invSubtotalNY + invForecastNY;
+  const invTotalNJ = invSubtotalNJ + invForecastNJ;
 
   const row = (id, label, combined, ny, nj, opts) => {
     opts = opts || {};
@@ -245,10 +257,12 @@ function renderKPIs(data) {
   };
 
   row('rowInvShipped', 'Shipped (Recognized)', invShipped, invShippedNY, invShippedNJ);
-  row('rowInvOverdue', '↳ of which Overdue (unpaid)', invOverdue, invOverdueNY, invOverdueNJ, { indent: true });
   row('rowInvScheduled', 'Scheduled (has ESD)', invScheduled, invScheduledNY, invScheduledNJ);
-  row('rowInvForecast', 'Forecast (no ESD yet)', invForecast, invForecastNY, invForecastNJ);
+  row('rowInvSubtotal', 'Subtotal (Shipped + Scheduled)', invSubtotal, invSubtotalNY, invSubtotalNJ, { bold: true });
+  row('rowInvForecast', 'Forecast (no ESD, ≤3 months old)', invForecast, invForecastNY, invForecastNJ);
   row('rowInvTotal', 'Total (Shipped + Scheduled + Forecast)', invTotal, invTotalNY, invTotalNJ, { bold: true });
+  document.getElementById('rowInvOverdueNote').textContent =
+    `Of the Shipped amount above, ${fmtUSD(invOverdue)} (Combined) is still unpaid past due — NY ${fmtUSD(invOverdueNY)}, NJ ${fmtUSD(invOverdueNJ)}.`;
 
   // --- Net Product Value table (before Freight/S&H/Tariff) ---------------
   const npvShipped = sum(data, 'netProductValueShipped');
