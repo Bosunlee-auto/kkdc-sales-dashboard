@@ -110,6 +110,7 @@
   </label>
 </div>
 
+<div class="kpi-row" id="kpiRow0" style="grid-template-columns:repeat(4,1fr); margin-bottom:12px;"></div>
 <div class="kpi-row" id="kpiRow"></div>
 <div class="kpi-row" id="kpiRow2"></div>
 
@@ -191,6 +192,24 @@ function renderKPIs(data) {
   const excludedCount = sum(data, 'marginExcludedCount');
   const excludedValue = sum(data, 'marginExcludedValue');
 
+  const invShipped = sum(data, 'invoiceShippedTotal');
+  const invShippedESD = sum(data, 'invoiceShippedESDTotal');
+  const invProforma = sum(data, 'invoiceProformaPendingTotal');
+  // #4 is the literal union of buckets 2+3 (bucket 1 is already a subset of
+  // bucket 2), per Bosun's definition (2026-08-25) - NOT the same as the
+  // pre-existing invoiceTotal metric, which also includes a small number of
+  // legacy invoices from before Invoice_Category existed as a field
+  // (confirmed live: 1 such invoice in 2026 alone). Computed here rather
+  // than reusing invoiceTotal so it exactly matches "all valid invoices in
+  // categories 1-3," with no legacy-data noise mixed in.
+  const invTotalIssued = invShippedESD + invProforma;
+
+  document.getElementById('kpiRow0').innerHTML = `
+    <div class="kpi"><div class="label">Invoice — Shipped (Recognized)</div><div class="value">${fmtUSD(invShipped)}</div></div>
+    <div class="kpi"><div class="label">Invoice — Shipped + ESD (Scheduled)</div><div class="value">${fmtUSD(invShippedESD)}</div></div>
+    <div class="kpi"><div class="label">Invoice — Proforma Pending (Forecast / Pipeline)</div><div class="value">${fmtUSD(invProforma)}</div></div>
+    <div class="kpi"><div class="label">Invoice — Total Issued (All Valid)</div><div class="value">${fmtUSD(invTotalIssued)}</div></div>
+  `;
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi"><div class="label">Invoice Total</div><div class="value">${fmtUSD(invoiceTotal)}</div></div>
     <div class="kpi"><div class="label">Invoice Total — NY</div><div class="value">${fmtUSD(invoiceTotalNY)}</div></div>
