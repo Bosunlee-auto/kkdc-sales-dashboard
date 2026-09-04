@@ -222,7 +222,11 @@
   </label>
 </div>
 
-<div class="kpi-row" id="kpiRow"></div>
+<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">Quote-based metrics</div>
+<div class="kpi-row" id="kpiRowQuote" style="grid-template-columns:repeat(5,1fr); margin-bottom:20px;"></div>
+
+<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">PO-based metrics</div>
+<div class="kpi-row" id="kpiRowPO" style="grid-template-columns:repeat(4,1fr);"></div>
 
 <div class="chart-card">
   <div class="chart-header"><h2>Funnel over time — combined US</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
@@ -528,6 +532,8 @@ function yoyBadge(pct) {
 function renderKPIs(data, yoy) {
   const combined = sum(data, 'combinedUS');
   const quote = sum(data, 'quoteAmount');
+  const quoteNY = sum(data, 'quoteAmountNY');
+  const quoteNJ = sum(data, 'quoteAmountNJ');
   const shipped = sum(data, 'shippedAmount');
   const shippedPlusESD = sum(data, 'shippedPlusESDAmount');
   const lost = sum(data, 'cancelledAmount');
@@ -548,6 +554,9 @@ function renderKPIs(data, yoy) {
   const priorCombined = sum(yoy.prior || [], 'combinedUS');
   const yoyLabel = yoyBadge(pctChange(combined, priorCombined));
 
+  const priorQuote = sum(yoy.prior || [], 'quoteAmount');
+  const quoteYoy = yoyBadge(pctChange(quote, priorQuote));
+
   const priorProjects = sum(yoy.prior || [], 'projectsRegistered');
   const priorQuoteCount = sum(yoy.prior || [], 'quoteCount');
   const priorPoCount = sum(yoy.prior || [], 'orderPOCount');
@@ -555,18 +564,25 @@ function renderKPIs(data, yoy) {
   const quoteCountYoy = yoyBadge(pctChange(quoteCount, priorQuoteCount));
   const poCountYoy = yoyBadge(pctChange(poCount, priorPoCount));
 
-  document.getElementById('kpiRow').innerHTML = `
+  // --- Quote-based metrics: everything driven by Quote Date --------------
+  document.getElementById('kpiRowQuote').innerHTML = `
+    <div class="kpi"><div class="label">Total Quote</div><div class="value">${fmtUSD(quote)}</div>${quoteYoy}</div>
+    <div class="kpi"><div class="label">Quote — NY</div><div class="value">${fmtUSD(quoteNY)}</div></div>
+    <div class="kpi"><div class="label">Quote — NJ</div><div class="value">${fmtUSD(quoteNJ)}</div></div>
+    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(projectsCount)}/wk)</span></div>${projectsYoy}</div>
+    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(quoteCount)}/wk)</span></div>${quoteCountYoy}</div>
+  `;
+
+  // --- PO-based metrics: everything driven by confirmed Order PO ---------
+  document.getElementById('kpiRowPO').innerHTML = `
     <div class="kpi"><div class="label">Combined US (Confirmed PO)</div><div class="value">${fmtUSD(combined)}</div>${yoyLabel}</div>
-    <div class="kpi"><div class="label">Total Quote</div><div class="value">${fmtUSD(quote)}</div></div>
-    <div class="kpi"><div class="label">NY office</div><div class="value">${fmtUSD(ny)}</div></div>
-    <div class="kpi"><div class="label">NJ office</div><div class="value">${fmtUSD(nj)}</div></div>
+    <div class="kpi"><div class="label">PO — NY</div><div class="value">${fmtUSD(ny)}</div></div>
+    <div class="kpi"><div class="label">PO — NJ</div><div class="value">${fmtUSD(nj)}</div></div>
+    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(poCount)}/wk)</span></div>${poCountYoy}</div>
     <div class="kpi"><div class="label">Shipped (realized)</div><div class="value">${fmtUSD(shipped)}</div></div>
     <div class="kpi"><div class="label">Shipped + ESD (realized + confirmed)</div><div class="value">${fmtUSD(shippedPlusESD)}</div></div>
     <div class="kpi"><div class="label">Margin</div><div class="value">${fmtUSD(margin)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${marginPct !== null ? marginPct.toFixed(1) + '%' : 'n/a'}</div></div>
     <div class="kpi"><div class="label">Lost Pipeline (Orders Cancelled)</div><div class="value" style="color:var(--lost)">${fmtUSD(lost)}</div></div>
-    <div class="kpi"><div class="label">No. of New Projects Registered</div><div class="value">${projectsCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(projectsCount)}/wk)</span></div>${projectsYoy}</div>
-    <div class="kpi"><div class="label">No. of Quotes</div><div class="value">${quoteCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(quoteCount)}/wk)</span></div>${quoteCountYoy}</div>
-    <div class="kpi"><div class="label">No. of POs (Confirmed)</div><div class="value">${poCount.toLocaleString()} <span style="font-size:12px;color:var(--muted);">(${perWeek(poCount)}/wk)</span></div>${poCountYoy}</div>
   `;
 }
 
@@ -627,6 +643,14 @@ function renderQuotaProgress(nyData, njData) {
   const njQuote = sum(njData, 'quoteAmount');
 
   const bars = [
+    {
+      name: 'Combined (NY + NJ)',
+      shipped: nyShipped + njShipped,
+      shippedESD: nyShippedESD + njShippedESD,
+      quote: nyQuote + njQuote,
+      bep: qpSettings.ny.bepAnnual + qpSettings.nj.bepAnnual,
+      quota: qpSettings.ny.quotaAnnual + qpSettings.nj.quotaAnnual
+    },
     { name: 'NY', shipped: nyShipped, shippedESD: nyShippedESD, quote: nyQuote, bep: qpSettings.ny.bepAnnual, quota: qpSettings.ny.quotaAnnual },
     { name: 'NJ', shipped: njShipped, shippedESD: njShippedESD, quote: njQuote, bep: qpSettings.nj.bepAnnual, quota: qpSettings.nj.quotaAnnual }
   ];
@@ -672,8 +696,9 @@ function renderQuotaBar(b) {
   const esdOnlyAmount = Math.max(0, b.shippedESD - b.shipped);
   const esdLabelPos = (fillPct + fillEsdPct) / 2;
 
+  const isCombined = b.name.startsWith('Combined');
   return `
-    <div class="qp-office">
+    <div class="qp-office" style="${isCombined ? 'padding-bottom:20px;border-bottom:2px solid var(--line);margin-bottom:20px;' : ''}">
       <div class="qp-office-name">${b.name}</div>
       <div class="qp-refs">BEP <b>${fmtUSD(bep)}</b> &nbsp;·&nbsp; Quota <b>${fmtUSD(quota)}</b> &nbsp;·&nbsp; Quote <b>${fmtUSD(b.quote)}</b></div>
       <table class="qp-metrics">
