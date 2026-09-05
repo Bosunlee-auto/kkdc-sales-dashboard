@@ -130,7 +130,8 @@
     <tr id="rowInvForecast"></tr>
     <tr id="rowInvTotal" style="border-top:2px solid var(--ink);"></tr>
   </table>
-  <div id="rowInvOverdueNote" style="font-size:12px;color:var(--lost);margin-bottom:20px;"></div>
+  <div id="rowInvOverdueNote" style="font-size:12px;color:var(--lost);margin-bottom:4px;"></div>
+  <div id="yoyExcludedNote" style="font-size:11px;color:var(--muted);margin-bottom:20px;"></div>
 
   <div class="chart-header"><h2>Net Product Value — by status and office</h2></div>
   <div class="note" style="margin-bottom:12px;">
@@ -197,6 +198,14 @@ let lastData = [];
 function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
 function sum(data, key) { return data.reduce((a, p) => a + (p[key] || 0), 0); }
 
+// Same YoY helper/style as index.html, ny-sales.html, nj-sales.html.
+function yoyPct(curr, prior) { return (prior && prior > 0) ? ((curr - prior) / prior) * 100 : null; }
+function yoyBadge(pct) {
+  if (pct === null || pct === undefined || !isFinite(pct)) return '';
+  const up = pct >= 0;
+  return `<span class="yoy ${up ? 'up' : 'down'}" style="display:inline-block;margin-left:6px;">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% YoY</span>`;
+}
+
 function showSpinner() { document.getElementById('spinnerOverlay').classList.add('active'); }
 function hideSpinner() { document.getElementById('spinnerOverlay').classList.remove('active'); }
 
@@ -207,13 +216,18 @@ async function loadDashboard() {
     const to = document.getElementById('to').value;
     const granularity = document.getElementById('granularity').value;
 
-    const res = await fetch(`/api/dashboard/total-invoice?from=${from}&to=${to}&granularity=${granularity}`);
+    const [res, yoyRes] = await Promise.all([
+      fetch(`/api/dashboard/total-invoice?from=${from}&to=${to}&granularity=${granularity}`),
+      fetch(`/api/dashboard/total-invoice/yoy?from=${from}&to=${to}&granularity=${granularity}`)
+    ]);
     const { data, error } = await res.json();
     if (error) { alert(error); return; }
+    const yoyJson = await yoyRes.json();
+    if (yoyJson.error) { console.error('YoY fetch failed:', yoyJson.error); }
 
     lastData = data;
 
-    renderKPIs(data);
+    renderKPIs(data, yoyJson.error ? null : yoyJson);
     renderInvoiceChart(data);
     renderOverageChart(data);
     renderMarginChart(data);
@@ -223,7 +237,13 @@ async function loadDashboard() {
   }
 }
 
-function renderKPIs(data) {
+function renderKPIs(data, yoy) {
+  // yoy = { current, prior, priorFrom, priorTo } from /total-invoice/yoy, or
+  // null if that fetch failed - every yoyBadge() call below degrades to ''
+  // in that case (yoyPct returns null when prior is 0/undefined).
+  const priorData = (yoy && yoy.prior) || [];
+  const priorSum = (key) => sum(priorData, key);
+
   // --- Invoice Amount table (full invoiced $, incl. Freight/S&H/Tariff) ---
   const invShipped = sum(data, 'invoiceShippedTotal');
   const invShippedNY = sum(data, 'invoiceShippedTotalNY');
@@ -247,22 +267,33 @@ function renderKPIs(data) {
   const invTotalNY = invSubtotalNY + invForecastNY;
   const invTotalNJ = invSubtotalNJ + invForecastNJ;
 
+  // Prior-year equivalents - ONLY for the Ship_Date-driven metrics (Shipped,
+  // Scheduled, and their Subtotal). Forecast/Overdue are deliberately
+  // excluded - see the /total-invoice/yoy route comment for why a "prior"
+  // Forecast/Overdue figure isn't meaningful.
+  const priorInvShipped = priorSum('invoiceShippedTotal');
+  const priorInvScheduled = priorSum('invoiceScheduledTotal');
+  const priorInvSubtotal = priorInvShipped + priorInvScheduled;
+
   const row = (id, label, combined, ny, nj, opts) => {
     opts = opts || {};
     const style = opts.indent ? 'padding-left:20px;color:var(--muted);' : (opts.bold ? 'font-weight:700;' : '');
     const nyCell = ny === null ? '—' : fmtUSD(ny);
     const njCell = nj === null ? '—' : fmtUSD(nj);
+    const badge = opts.yoyPct !== undefined ? yoyBadge(opts.yoyPct) : '';
     document.getElementById(id).innerHTML =
-      `<td style="text-align:left;${style}">${label}</td><td>${fmtUSD(combined)}</td><td>${nyCell}</td><td>${njCell}</td>`;
+      `<td style="text-align:left;${style}">${label}</td><td>${fmtUSD(combined)}${badge}</td><td>${nyCell}</td><td>${njCell}</td>`;
   };
 
-  row('rowInvShipped', 'Shipped (Recognized)', invShipped, invShippedNY, invShippedNJ);
-  row('rowInvScheduled', 'Scheduled (has ESD)', invScheduled, invScheduledNY, invScheduledNJ);
-  row('rowInvSubtotal', 'Subtotal (Shipped + Scheduled)', invSubtotal, invSubtotalNY, invSubtotalNJ, { bold: true });
+  row('rowInvShipped', 'Shipped (Recognized)', invShipped, invShippedNY, invShippedNJ, { yoyPct: yoyPct(invShipped, priorInvShipped) });
+  row('rowInvScheduled', 'Scheduled (has ESD)', invScheduled, invScheduledNY, invScheduledNJ, { yoyPct: yoyPct(invScheduled, priorInvScheduled) });
+  row('rowInvSubtotal', 'Subtotal (Shipped + Scheduled)', invSubtotal, invSubtotalNY, invSubtotalNJ, { bold: true, yoyPct: yoyPct(invSubtotal, priorInvSubtotal) });
   row('rowInvForecast', 'Forecast (no ESD, ≤3 months old)', invForecast, invForecastNY, invForecastNJ);
   row('rowInvTotal', 'Total (Shipped + Scheduled + Forecast)', invTotal, invTotalNY, invTotalNJ, { bold: true });
   document.getElementById('rowInvOverdueNote').textContent =
     `Of the Shipped amount above, ${fmtUSD(invOverdue)} (Combined) is still unpaid past due — NY ${fmtUSD(invOverdueNY)}, NJ ${fmtUSD(invOverdueNJ)}.`;
+  document.getElementById('yoyExcludedNote').textContent =
+    'YoY % is shown for Shipped, Scheduled, and their Subtotal only. Forecast, Overdue, and Total are "as of right now" snapshots, not a historical time series - a prior-year figure for them would just repeat today\'s live numbers, so it\'s left out rather than shown as a misleading comparison.';
 
   // --- Net Product Value table (before Freight/S&H/Tariff) ---------------
   const npvShipped = sum(data, 'netProductValueShipped');
@@ -278,12 +309,18 @@ function renderKPIs(data) {
   const npvTotalNY = npvShippedNY + npvScheduledNY + npvForecastNY;
   const npvTotalNJ = npvShippedNJ + npvScheduledNJ + npvForecastNJ;
 
-  row('rowNpvShipped', 'Shipped (Recognized)', npvShipped, npvShippedNY, npvShippedNJ);
-  row('rowNpvScheduled', 'Scheduled (has ESD)', npvScheduled, npvScheduledNY, npvScheduledNJ);
+  const priorNpvShipped = priorSum('netProductValueShipped');
+  const priorNpvScheduled = priorSum('netProductValueScheduled');
+
+  row('rowNpvShipped', 'Shipped (Recognized)', npvShipped, npvShippedNY, npvShippedNJ, { yoyPct: yoyPct(npvShipped, priorNpvShipped) });
+  row('rowNpvScheduled', 'Scheduled (has ESD)', npvScheduled, npvScheduledNY, npvScheduledNJ, { yoyPct: yoyPct(npvScheduled, priorNpvScheduled) });
   row('rowNpvForecast', 'Forecast (no ESD yet)', npvForecast, npvForecastNY, npvForecastNJ);
   row('rowNpvTotal', 'Total (Shipped + Scheduled + Forecast)', npvTotal, npvTotalNY, npvTotalNJ, { bold: true });
 
   // --- Margin & Overage (combined across all statuses, see note above) ---
+  // All four of these are computed inside the main Ship_Date-bucketed loop
+  // in getInvoiceDashboard (never touched by the today-snapshot
+  // Forecast/Overdue blocks), so YoY is genuinely meaningful here too.
   const margin = sum(data, 'marginTotal');
   const marginNY = sum(data, 'marginTotalNY');
   const marginNJ = sum(data, 'marginTotalNJ');
@@ -293,10 +330,15 @@ function renderKPIs(data) {
   const excludedCount = sum(data, 'marginExcludedCount');
   const excludedValue = sum(data, 'marginExcludedValue');
 
-  row('rowMargin', 'Margin', margin, marginNY, marginNJ, { bold: true });
-  row('rowOverageAgency', 'Overage — Agency (80%)', overageAgency, null, null);
-  row('rowOverageCompany', 'Overage — KKDC (20%)', overageCompany, null, null);
-  row('rowCostFreightTariff', 'Cost + Freight + Tariff', costFreightTariff, null, null);
+  const priorMargin = priorSum('marginTotal');
+  const priorOverageAgency = priorSum('overageAgencyShare');
+  const priorOverageCompany = priorSum('overageCompanyShare');
+  const priorCostFreightTariff = priorSum('costOfGoods') + priorSum('freightTotal') + priorSum('tariffTotal');
+
+  row('rowMargin', 'Margin', margin, marginNY, marginNJ, { bold: true, yoyPct: yoyPct(margin, priorMargin) });
+  row('rowOverageAgency', 'Overage — Agency (80%)', overageAgency, null, null, { yoyPct: yoyPct(overageAgency, priorOverageAgency) });
+  row('rowOverageCompany', 'Overage — KKDC (20%)', overageCompany, null, null, { yoyPct: yoyPct(overageCompany, priorOverageCompany) });
+  row('rowCostFreightTariff', 'Cost + Freight + Tariff', costFreightTariff, null, null, { yoyPct: yoyPct(costFreightTariff, priorCostFreightTariff) });
 
   document.getElementById('marginExcludedNote').textContent =
     excludedCount > 0
