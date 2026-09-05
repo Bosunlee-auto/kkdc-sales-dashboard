@@ -4,6 +4,7 @@ const router = express.Router();
 const { requireDashboard } = require('./auth');
 const { getOfficeSalesPerformance } = require('../lib/officeSales');
 const { getInvoiceDashboard } = require('../lib/invoiceDashboard');
+const { getInvoiceDrilldown } = require('../lib/invoiceDrilldown');
 
 // Same helper as server.js's shiftYear - duplicated here (rather than
 // exported/imported) since it's a one-line pure function and this router
@@ -99,6 +100,25 @@ router.get('/total-invoice/yoy', requireDashboard('TOTAL_INVOICE'), async (req, 
     res.json({ current, prior, priorFrom, priorTo });
   } catch (err) {
     console.error('total-invoice yoy error', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/dashboard/total-invoice/drilldown?period=2026-04&granularity=month
+// Click-through detail for any point on the Total Invoice charts (Invoice
+// Total/NPV, Overage, Margin components, Margin %) - all four draw from the
+// same underlying Invoices record set for a given period, so one endpoint
+// serves all of them; the frontend just chooses which columns to display.
+router.get('/total-invoice/drilldown', requireDashboard('TOTAL_INVOICE'), async (req, res) => {
+  try {
+    const { period, granularity } = req.query;
+    if (!period) {
+      return res.status(400).json({ error: 'period is required, e.g. period=2026-04&granularity=month' });
+    }
+    const records = await getInvoiceDrilldown({ period, granularity: granularity || 'month' });
+    res.json({ records });
+  } catch (err) {
+    console.error('total-invoice drilldown error', err.message);
     res.status(500).json({ error: err.message });
   }
 });
