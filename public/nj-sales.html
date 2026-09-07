@@ -5,6 +5,7 @@
 <title>KKDC Sales Performance — NJ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="/auth-guard.js"></script>
+<script src="/drilldown.js"></script>
 <style>
   :root {
     --ink: #1a1d1f; --muted: #6b7280; --line: #e5e7eb; --bg: #fafafa; --card: #ffffff;
@@ -156,6 +157,7 @@
 
 <div class="chart-card">
   <div class="chart-header"><h2>Funnel over time — NJ</h2><button class="table-toggle" data-target="funnel">📊 Table</button></div>
+  <div style="font-size:11px;color:var(--muted);margin:-8px 0 8px;">💡 Click a point (Quote/Order PO/Shipped+ESD/Shipped) to see the underlying records for that period.</div>
   <canvas id="funnelChart"></canvas>
   <div id="funnelTable" class="data-table" style="display:none;"></div>
 </div>
@@ -476,6 +478,16 @@ function renderFunnelChart(data) {
   const quota = perPeriod(settings.quotaAnnual, granularity);
   const flat = (v) => data.map(() => v);
 
+  const options = {
+    responsive: true,
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      y: { position: 'left', title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } }, ticks: { callback: v => fmtUSD(v) } },
+      y1: { position: 'right', title: { display: true, text: 'Order PO / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } }, grid: { drawOnChartArea: false }, ticks: { callback: v => fmtUSD(v) } }
+    }
+  };
+  attachFunnelDrilldownOnClick(options, OFFICE_KEY, () => document.getElementById('granularity').value);
+
   charts.funnel = new Chart(document.getElementById('funnelChart'), {
     type: 'line',
     data: {
@@ -489,14 +501,7 @@ function renderFunnelChart(data) {
         { label: `${OFFICE_KEY} Quota`, data: flat(quota), borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, yAxisID: 'y1' }
       ]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        y: { position: 'left', title: { display: true, text: 'Quote (latest)', color: '#9ca3af', font: { size: 11 } }, ticks: { callback: v => fmtUSD(v) } },
-        y1: { position: 'right', title: { display: true, text: 'Order PO / Shipped / BEP / Quota', color: '#6b7280', font: { size: 11 } }, grid: { drawOnChartArea: false }, ticks: { callback: v => fmtUSD(v) } }
-      }
-    }
+    options
   });
 }
 
@@ -506,6 +511,7 @@ function renderQuotaProgress(data, priorData) {
   const quote = sum(data, 'quoteAmount');
   const shippedPrior = sum(priorData || [], 'shippedAmount');
   const shippedESDPrior = sum(priorData || [], 'shippedPlusESDAmount');
+  const quotePrior = sum(priorData || [], 'quoteAmount');
   const bep = qpBep || 0;
   const quota = qpQuota > 0 ? qpQuota : 1;
   const bepPct = Math.min(100, (bep / quota) * 100);
@@ -540,6 +546,7 @@ function renderQuotaProgress(data, priorData) {
   };
   const shipYoy = yoyBadgeInline(yoyPct(shipped, shippedPrior));
   const shipESDYoy = yoyBadgeInline(yoyPct(shippedESD, shippedESDPrior));
+  const quoteYoy = yoyBadgeInline(yoyPct(quote, quotePrior));
 
   const fillPct = Math.min(100, Math.max(0, (shipped / quota) * 100));
   const fillEsdPct = Math.min(100, Math.max(0, (shippedESD / quota) * 100));
@@ -550,7 +557,7 @@ function renderQuotaProgress(data, priorData) {
     <div class="qp-row">
       <div class="qp-office">
         <div class="qp-office-name">${OFFICE_KEY}</div>
-        <div class="qp-refs">BEP <b>${fmtUSD(bep)}</b> &nbsp;·&nbsp; Quota <b>${fmtUSD(quota)}</b> &nbsp;·&nbsp; Quote <b>${fmtUSD(quote)}</b></div>
+        <div class="qp-refs">BEP <b>${fmtUSD(bep)}</b> &nbsp;·&nbsp; Quota <b>${fmtUSD(quota)}</b> &nbsp;·&nbsp; Quote <b>${fmtUSD(quote)}</b>${quoteYoy}</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Based on product value as quoted (Office Full Credit) — Overage and other adjustments not included.</div>
         <table class="qp-metrics">
           <tr><th>Metric</th><th>Amount</th><th>vs BEP</th><th>vs Quota</th><th>Success Rate (vs Quote)</th></tr>
