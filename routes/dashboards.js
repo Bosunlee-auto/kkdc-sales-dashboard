@@ -111,11 +111,12 @@ router.get('/total-invoice/yoy', requireDashboard('TOTAL_INVOICE'), async (req, 
 // serves all of them; the frontend just chooses which columns to display.
 router.get('/total-invoice/drilldown', requireDashboard('TOTAL_INVOICE'), async (req, res) => {
   try {
-    const { period, granularity } = req.query;
+    const { period, granularity, office } = req.query;
     if (!period) {
       return res.status(400).json({ error: 'period is required, e.g. period=2026-04&granularity=month' });
     }
-    const records = await getInvoiceDrilldown({ period, granularity: granularity || 'month' });
+    const officeParam = office === 'NY' || office === 'NJ' ? office : null;
+    const records = await getInvoiceDrilldown({ period, granularity: granularity || 'month', office: officeParam });
     res.json({ records });
   } catch (err) {
     console.error('total-invoice drilldown error', err.message);
