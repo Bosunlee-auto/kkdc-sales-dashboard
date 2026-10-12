@@ -129,23 +129,24 @@ let invDdCurrentLabel = '';
  * period: chart x-axis label, e.g. '2026-04'
  * granularity: 'month' | 'quarter' | 'year'
  */
-async function openInvoiceDrilldown(chartKey, period, granularity) {
+async function openInvoiceDrilldown(chartKey, period, granularity, office) {
   const overlay = document.getElementById('invDdOverlay');
   const body = document.getElementById('invDdBody');
   const title = document.getElementById('invDdTitle');
   const sub = document.getElementById('invDdSub');
   const footer = document.getElementById('invDdFooter');
 
-  title.textContent = `${INV_CHART_TITLES[chartKey] || chartKey} — ${period}`;
+  const officeTag = office ? ` (${office} Office)` : '';
+  title.textContent = `${INV_CHART_TITLES[chartKey] || chartKey}${officeTag} — ${period}`;
   sub.textContent = 'Underlying invoices for this period';
   body.innerHTML = '<div class="inv-dd-state">Loading...</div>';
   footer.textContent = '';
   invDdCurrentRecords = [];
-  invDdCurrentLabel = `${INV_CHART_TITLES[chartKey] || chartKey} ${period}`;
+  invDdCurrentLabel = `${INV_CHART_TITLES[chartKey] || chartKey}${officeTag} ${period}`;
   overlay.classList.add('open');
 
   try {
-    const res = await fetch(`/api/dashboard/total-invoice/drilldown?period=${encodeURIComponent(period)}&granularity=${granularity}`);
+    const res = await fetch(`/api/dashboard/total-invoice/drilldown?period=${encodeURIComponent(period)}&granularity=${granularity}${office ? `&office=${office}` : ''}`);
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Request failed (${res.status})`);
@@ -262,14 +263,14 @@ function exportInvoiceDrilldownCSV() {
  *   modal title/CSV filename - see openInvoiceDrilldown).
  * getGranularity: function returning the current granularity string.
  */
-function attachInvoiceChartDrilldownOnClick(options, chartKey, getGranularity) {
+function attachInvoiceChartDrilldownOnClick(options, chartKey, getGranularity, office) {
   const existingOnClick = options.onClick;
   options.onClick = (evt, elements, chart) => {
     if (existingOnClick) existingOnClick(evt, elements, chart);
     if (!elements || elements.length === 0) return;
     const period = chart.data.labels[elements[0].index];
     if (!period) return;
-    openInvoiceDrilldown(chartKey, period, getGranularity());
+    openInvoiceDrilldown(chartKey, period, getGranularity(), office || null);
   };
   const existingOnHover = options.onHover;
   options.onHover = (evt, elements, chart) => {
