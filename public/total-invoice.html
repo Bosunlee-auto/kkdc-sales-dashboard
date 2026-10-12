@@ -90,6 +90,13 @@
     border-radius: 50%; animation: kkdc-spin 0.8s linear infinite;
   }
   @keyframes kkdc-spin { to { transform: rotate(360deg); } }
+  .office-section { border-left: 4px solid var(--line); padding-left: 14px; margin: 28px 0 8px; }
+  .office-section.ny { border-left-color: var(--ny); }
+  .office-section.nj { border-left-color: var(--nj); }
+  .office-section > h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .office-section.ny > h2 { color: var(--ny); }
+  .office-section.nj > h2 { color: var(--nj); }
+  .office-section .office-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
 </style>
 </head>
 <body data-dashboard="TOTAL_INVOICE">
@@ -160,6 +167,11 @@
   <div id="marginExcludedNote" style="font-size:11px;color:var(--lost);margin-top:8px;"></div>
 </div>
 
+<div class="office-section">
+  <h2>Combined (NY + NJ)</h2>
+  <div class="office-sub">Office attribution: invoice Office Div, falling back to the linked Sales Order's when blank; Joint Territory split 50/50.</div>
+</div>
+
 <div class="chart-card">
   <div class="chart-header"><h2>Invoice total vs. net product value</h2><button class="table-toggle" data-target="invoice">📊 Table</button></div>
   <div style="font-size:11px;color:var(--muted);margin:-8px 0 8px;">💡 Click a point to see the underlying invoices for that period.</div>
@@ -188,6 +200,9 @@
   <canvas id="marginPctChart"></canvas>
   <div id="marginPctTable" class="data-table" style="display:none;"></div>
 </div>
+
+<!-- NY / NJ office sub-sections (2026-10-12) - built by buildOfficeSections() -->
+<div id="officeSections"></div>
 
 <script>
 document.getElementById('to').value = new Date().toISOString().slice(0, 10);
@@ -233,10 +248,9 @@ async function loadDashboard() {
     lastData = data;
 
     renderKPIs(data, yoyJson.error ? null : yoyJson);
-    renderInvoiceChart(data);
-    renderOverageChart(data);
-    renderMarginChart(data);
-    renderMarginPctChart(data);
+    renderChartSet(data, '');
+    for (const o of OFFICES) renderChartSet(data, o.sfx);
+    renderOfficeSubs(data);
   } finally {
     hideSpinner();
   }
@@ -331,7 +345,8 @@ function renderKPIs(data, yoy) {
   const marginNJ = sum(data, 'marginTotalNJ');
   const overageAgency = sum(data, 'overageAgencyShare');
   const overageCompany = sum(data, 'overageCompanyShare');
-  const costFreightTariff = sum(data, 'costOfGoods') + sum(data, 'freightTotal') + sum(data, 'tariffTotal');
+  const cft = (sfx) => sum(data, 'costOfGoods' + sfx) + sum(data, 'freightTotal' + sfx) + sum(data, 'tariffTotal' + sfx);
+  const costFreightTariff = cft('');
   const excludedCount = sum(data, 'marginExcludedCount');
   const excludedValue = sum(data, 'marginExcludedValue');
 
@@ -341,9 +356,9 @@ function renderKPIs(data, yoy) {
   const priorCostFreightTariff = priorSum('costOfGoods') + priorSum('freightTotal') + priorSum('tariffTotal');
 
   row('rowMargin', 'Margin', margin, marginNY, marginNJ, { bold: true, yoyPct: yoyPct(margin, priorMargin) });
-  row('rowOverageAgency', 'Overage — Agency (80%)', overageAgency, null, null, { yoyPct: yoyPct(overageAgency, priorOverageAgency) });
-  row('rowOverageCompany', 'Overage — KKDC (20%)', overageCompany, null, null, { yoyPct: yoyPct(overageCompany, priorOverageCompany) });
-  row('rowCostFreightTariff', 'Cost + Freight + Tariff', costFreightTariff, null, null, { yoyPct: yoyPct(costFreightTariff, priorCostFreightTariff) });
+  row('rowOverageAgency', 'Overage — Agency (80%)', overageAgency, sum(data, 'overageAgencyShareNY'), sum(data, 'overageAgencyShareNJ'), { yoyPct: yoyPct(overageAgency, priorOverageAgency) });
+  row('rowOverageCompany', 'Overage — KKDC (20%)', overageCompany, sum(data, 'overageCompanyShareNY'), sum(data, 'overageCompanyShareNJ'), { yoyPct: yoyPct(overageCompany, priorOverageCompany) });
+  row('rowCostFreightTariff', 'Cost + Freight + Tariff', costFreightTariff, cft('NY'), cft('NJ'), { yoyPct: yoyPct(costFreightTariff, priorCostFreightTariff) });
 
   document.getElementById('marginExcludedNote').textContent =
     excludedCount > 0
@@ -351,83 +366,137 @@ function renderKPIs(data, yoy) {
       : '';
 }
 
-function renderInvoiceChart(data) {
+// --- Chart sets: '' = Combined, 'NY' / 'NJ' = office sub-sections ------
+const OFFICES = [
+  { sfx: 'NY', cls: 'ny', name: 'NY Office' },
+  { sfx: 'NJ', cls: 'nj', name: 'NJ Office' }
+];
+const CHART_KEYS = ['invoice', 'overage', 'margin', 'marginPct'];
+
+function buildOfficeSections() {
+  const card = (key, sfx, title, hint) => `
+    <div class="chart-card">
+      <div class="chart-header"><h2>${title}</h2><button class="table-toggle" data-target="${key}${sfx}">📊 Table</button></div>
+      <div style="font-size:11px;color:var(--muted);margin:-8px 0 8px;">💡 ${hint}</div>
+      <canvas id="${key}${sfx}Chart"></canvas>
+      <div id="${key}${sfx}Table" class="data-table" style="display:none;"></div>
+    </div>`;
+  document.getElementById('officeSections').innerHTML = OFFICES.map(o => `
+    <div class="office-section ${o.cls}">
+      <h2>${o.name}</h2>
+      <div class="office-sub" id="officeSub${o.sfx}"></div>
+    </div>
+    ${card('invoice', o.sfx, 'Invoice total vs. net product value', 'Click a point to see this office\'s invoices for that period.')}
+    <div class="grid2">
+      ${card('overage', o.sfx, 'Overage — agency (80%) vs. KKDC (20%)', 'Click a point for invoice-level detail.')}
+      ${card('margin', o.sfx, 'Margin components', 'Click a point for invoice-level detail.')}
+    </div>
+    ${card('marginPct', o.sfx, 'Margin % over time', 'Click a point for invoice-level detail.')}
+  `).join('');
+}
+buildOfficeSections();
+
+const v = (p, key, sfx) => p[key + sfx] || 0;
+const officeOf = (sfx) => sfx || null;
+
+function renderInvoiceChart(data, sfx = '') {
   const options = { responsive: true, plugins: { legend: { position: 'bottom' } } };
-  attachInvoiceChartDrilldownOnClick(options, 'invoice', () => document.getElementById('granularity').value);
-  charts.invoice = new Chart(document.getElementById('invoiceChart'), {
+  attachInvoiceChartDrilldownOnClick(options, 'invoice', () => document.getElementById('granularity').value, officeOf(sfx));
+  charts['invoice' + sfx] = new Chart(document.getElementById(`invoice${sfx}Chart`), {
     type: 'line',
     data: { labels: data.map(p => p.period), datasets: [
-      { label: 'Invoice Total', data: data.map(p => p.invoiceTotal), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2 },
-      { label: 'Net Product Value', data: data.map(p => p.netProductValue), borderColor: '#2563eb', borderWidth: 2, tension: 0.2 }
+      { label: 'Invoice Total', data: data.map(p => v(p, 'invoiceTotal', sfx)), borderColor: '#1a1d1f', borderWidth: 2, tension: 0.2 },
+      { label: 'Net Product Value', data: data.map(p => v(p, 'netProductValue', sfx)), borderColor: '#2563eb', borderWidth: 2, tension: 0.2 }
     ]},
     options
   });
 }
 
-function renderOverageChart(data) {
-  const totals = data.map(p => (p.overageAgencyShare || 0) + (p.overageCompanyShare || 0));
+function renderOverageChart(data, sfx = '') {
+  const totals = data.map(p => v(p, 'overageAgencyShare', sfx) + v(p, 'overageCompanyShare', sfx));
   const options = {
     responsive: true,
-    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: val => fmtUSD(val) } } },
     plugins: {
       legend: { position: 'bottom' },
       datalabels: {
         display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 24,
         color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
         font: { size: 10, weight: '600' },
-        formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        formatter: (val) => val > 0 ? fmtUSD(val) : ''
       }
     }
   };
-  attachInvoiceChartDrilldownOnClick(options, 'overage', () => document.getElementById('granularity').value);
-  charts.overage = new Chart(document.getElementById('overageChart'), {
+  attachInvoiceChartDrilldownOnClick(options, 'overage', () => document.getElementById('granularity').value, officeOf(sfx));
+  charts['overage' + sfx] = new Chart(document.getElementById(`overage${sfx}Chart`), {
     data: { labels: data.map(p => p.period), datasets: [
-      { type: 'bar', label: 'Agency (80%)', data: data.map(p => p.overageAgencyShare), backgroundColor: '#f59e0b', stack: 'overage' },
-      { type: 'bar', label: 'KKDC (20%)', data: data.map(p => p.overageCompanyShare), backgroundColor: '#1a1d1f', stack: 'overage' },
+      { type: 'bar', label: 'Agency (80%)', data: data.map(p => v(p, 'overageAgencyShare', sfx)), backgroundColor: '#f59e0b', stack: 'overage' },
+      { type: 'bar', label: 'KKDC (20%)', data: data.map(p => v(p, 'overageCompanyShare', sfx)), backgroundColor: '#1a1d1f', stack: 'overage' },
       { type: 'line', label: 'Total Overage', data: totals, borderColor: '#7c3aed', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7c3aed', fill: false }
     ]},
     options
   });
 }
 
-function renderMarginChart(data) {
-  const totals = data.map(p => (p.costOfGoods || 0) + (p.freightTotal || 0) + (p.tariffTotal || 0) + (p.marginTotal || 0));
+function renderMarginChart(data, sfx = '') {
+  const totals = data.map(p => v(p, 'costOfGoods', sfx) + v(p, 'freightTotal', sfx) + v(p, 'tariffTotal', sfx) + v(p, 'marginTotal', sfx));
   const options = {
     responsive: true,
-    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtUSD(v) } } },
+    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: val => fmtUSD(val) } } },
     plugins: {
       legend: { position: 'bottom' },
       datalabels: {
         display: (ctx) => ctx.dataset.type !== 'line' && ctx.dataset.data[ctx.dataIndex] > 0 && (ctx.chart.height / data.length) > 20,
         color: (ctx) => ctx.dataset.backgroundColor === '#f59e0b' ? '#1a1d1f' : '#fff',
         font: { size: 9, weight: '600' },
-        formatter: (v) => v > 0 ? fmtUSD(v) : ''
+        formatter: (val) => val > 0 ? fmtUSD(val) : ''
       }
     }
   };
-  attachInvoiceChartDrilldownOnClick(options, 'margin', () => document.getElementById('granularity').value);
-  charts.margin = new Chart(document.getElementById('marginChart'), {
+  attachInvoiceChartDrilldownOnClick(options, 'margin', () => document.getElementById('granularity').value, officeOf(sfx));
+  charts['margin' + sfx] = new Chart(document.getElementById(`margin${sfx}Chart`), {
     data: { labels: data.map(p => p.period), datasets: [
-      { type: 'bar', label: 'Cost of Goods', data: data.map(p => p.costOfGoods), backgroundColor: '#6b7280', stack: 'margin' },
-      { type: 'bar', label: 'Freight', data: data.map(p => p.freightTotal), backgroundColor: '#f59e0b', stack: 'margin' },
-      { type: 'bar', label: 'Tariff', data: data.map(p => p.tariffTotal), backgroundColor: '#dc2626', stack: 'margin' },
-      { type: 'bar', label: 'Margin', data: data.map(p => p.marginTotal), backgroundColor: '#059669', stack: 'margin' },
+      { type: 'bar', label: 'Cost of Goods', data: data.map(p => v(p, 'costOfGoods', sfx)), backgroundColor: '#6b7280', stack: 'margin' },
+      { type: 'bar', label: 'Freight', data: data.map(p => v(p, 'freightTotal', sfx)), backgroundColor: '#f59e0b', stack: 'margin' },
+      { type: 'bar', label: 'Tariff', data: data.map(p => v(p, 'tariffTotal', sfx)), backgroundColor: '#dc2626', stack: 'margin' },
+      { type: 'bar', label: 'Margin', data: data.map(p => v(p, 'marginTotal', sfx)), backgroundColor: '#059669', stack: 'margin' },
       { type: 'line', label: 'Net Product Value', data: totals, borderColor: '#2563eb', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#2563eb', fill: false }
     ]},
     options
   });
 }
 
-function renderMarginPctChart(data) {
-  const options = { responsive: true, scales: { y: { ticks: { callback: v => v + '%' } } } };
-  attachInvoiceChartDrilldownOnClick(options, 'marginPct', () => document.getElementById('granularity').value);
-  charts.marginPct = new Chart(document.getElementById('marginPctChart'), {
+function renderMarginPctChart(data, sfx = '') {
+  const options = { responsive: true, scales: { y: { ticks: { callback: val => val + '%' } } } };
+  attachInvoiceChartDrilldownOnClick(options, 'marginPct', () => document.getElementById('granularity').value, officeOf(sfx));
+  charts['marginPct' + sfx] = new Chart(document.getElementById(`marginPct${sfx}Chart`), {
     type: 'line',
     data: { labels: data.map(p => p.period), datasets: [
-      { label: 'Margin %', data: data.map(p => p.marginPct), borderColor: '#059669', borderWidth: 2, tension: 0.2 }
+      { label: 'Margin %', data: data.map(p => p['marginPct' + sfx]), borderColor: '#059669', borderWidth: 2, tension: 0.2 }
     ]},
     options
   });
+}
+
+function renderChartSet(data, sfx = '') {
+  renderInvoiceChart(data, sfx);
+  renderOverageChart(data, sfx);
+  renderMarginChart(data, sfx);
+  renderMarginPctChart(data, sfx);
+}
+
+function renderOfficeSubs(data) {
+  for (const o of OFFICES) {
+    const inv = sum(data, 'invoiceTotal' + o.sfx);
+    const npv = sum(data, 'netProductValue' + o.sfx);
+    const m = sum(data, 'marginTotal' + o.sfx);
+    const exCnt = sum(data, 'marginExcludedCount' + o.sfx);
+    const exVal = sum(data, 'marginExcludedValue' + o.sfx);
+    const pct = npv > 0 ? ((m / npv) * 100).toFixed(1) + '%' : 'n/a';
+    document.getElementById('officeSub' + o.sfx).textContent =
+      `Invoice total ${fmtUSD(inv)} · Net Product Value ${fmtUSD(npv)} · Margin ${fmtUSD(m)} (${pct})` +
+      (exCnt > 0 ? ` · margin excluded: ${fmtUSD(exVal)}` : '');
+  }
 }
 
 // --- Table view toggle (same pattern as Total Sales / NY / NJ) -----------
@@ -437,36 +506,41 @@ function buildTable(headers, rows) {
   return `<table>${head}${body}</table>`;
 }
 
-function renderInvoiceTable(data) {
-  document.getElementById('invoiceTable').innerHTML = buildTable(
+function renderInvoiceTable(data, sfx = '') {
+  document.getElementById(`invoice${sfx}Table`).innerHTML = buildTable(
     ['Period', 'Invoice Total', 'Net Product Value'],
-    data.map(p => [p.period, fmtUSD(p.invoiceTotal), fmtUSD(p.netProductValue)])
+    data.map(p => [p.period, fmtUSD(v(p, 'invoiceTotal', sfx)), fmtUSD(v(p, 'netProductValue', sfx))])
   );
 }
-function renderOverageTable(data) {
-  document.getElementById('overageTable').innerHTML = buildTable(
+function renderOverageTable(data, sfx = '') {
+  document.getElementById(`overage${sfx}Table`).innerHTML = buildTable(
     ['Period', 'Agency (80%)', 'KKDC (20%)'],
-    data.map(p => [p.period, fmtUSD(p.overageAgencyShare), fmtUSD(p.overageCompanyShare)])
+    data.map(p => [p.period, fmtUSD(v(p, 'overageAgencyShare', sfx)), fmtUSD(v(p, 'overageCompanyShare', sfx))])
   );
 }
-function renderMarginTable(data) {
-  document.getElementById('marginTable').innerHTML = buildTable(
+function renderMarginTable(data, sfx = '') {
+  document.getElementById(`margin${sfx}Table`).innerHTML = buildTable(
     ['Period', 'Cost of Goods', 'Freight', 'Tariff', 'Margin'],
-    data.map(p => [p.period, fmtUSD(p.costOfGoods), fmtUSD(p.freightTotal), fmtUSD(p.tariffTotal), fmtUSD(p.marginTotal)])
+    data.map(p => [p.period, fmtUSD(v(p, 'costOfGoods', sfx)), fmtUSD(v(p, 'freightTotal', sfx)), fmtUSD(v(p, 'tariffTotal', sfx)), fmtUSD(v(p, 'marginTotal', sfx))])
   );
 }
-function renderMarginPctTable(data) {
-  document.getElementById('marginPctTable').innerHTML = buildTable(
+function renderMarginPctTable(data, sfx = '') {
+  document.getElementById(`marginPct${sfx}Table`).innerHTML = buildTable(
     ['Period', 'Margin %'],
-    data.map(p => [p.period, p.marginPct !== null && p.marginPct !== undefined ? p.marginPct.toFixed(1) + '%' : 'n/a'])
+    data.map(p => {
+      const val = p['marginPct' + sfx];
+      return [p.period, val !== null && val !== undefined ? val.toFixed(1) + '%' : 'n/a'];
+    })
   );
 }
 
 function renderAllTables() {
-  renderInvoiceTable(lastData);
-  renderOverageTable(lastData);
-  renderMarginTable(lastData);
-  renderMarginPctTable(lastData);
+  for (const sfx of ['', ...OFFICES.map(o => o.sfx)]) {
+    renderInvoiceTable(lastData, sfx);
+    renderOverageTable(lastData, sfx);
+    renderMarginTable(lastData, sfx);
+    renderMarginPctTable(lastData, sfx);
+  }
 }
 
 document.querySelectorAll('.table-toggle').forEach(btn => {
